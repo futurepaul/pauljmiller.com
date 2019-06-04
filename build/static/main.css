@@ -1,0 +1,189 @@
+/* libre-baskerville-regular - latin */
+@font-face {
+  font-family: "Libre Baskerville";
+  font-style: normal;
+  font-weight: 400;
+  src: local("Libre Baskerville"), local("LibreBaskerville-Regular"),
+    url("/static/fonts/libre-baskerville-v6-latin-regular.woff2")
+      format("woff2"),
+    /* Chrome 26+, Opera 23+, Firefox 39+ */
+      url("/static/fonts/libre-baskerville-v6-latin-regular.woff")
+      format("woff"); /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+/* libre-baskerville-italic - latin */
+@font-face {
+  font-family: "Libre Baskerville";
+  font-style: italic;
+  font-weight: 400;
+  src: local("Libre Baskerville Italic"), local("LibreBaskerville-Italic"),
+    url("/static/fonts/libre-baskerville-v6-latin-italic.woff2") format("woff2"),
+    /* Chrome 26+, Opera 23+, Firefox 39+ */
+      url("/static/fonts/libre-baskerville-v6-latin-italic.woff") format("woff"); /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+/* inconsolata-regular - latin */
+@font-face {
+  font-family: "Inconsolata";
+  font-style: normal;
+  font-weight: 400;
+  src: local("Inconsolata Regular"), local("Inconsolata-Regular"),
+    url("/static/fonts/inconsolata-v17-latin-regular.woff2") format("woff2"),
+    /* Chrome 26+, Opera 23+, Firefox 39+ */
+      url("/static/fonts/inconsolata-v17-latin-regular.woff") format("woff"); /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+@font-face {
+  font-family: "aileronlight";
+  src: url("/static/fonts/Aileron-Light-webfont.woff") format("woff");
+  font-weight: normal;
+  font-style: normal;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: normal;
+  font-family: "Libre Baskerville";
+}
+
+body {
+  font-size: 18px;
+  max-width: 35rem;
+  margin: 0 auto;
+  padding: 2em 1em 2em 1em;
+  font-family: "Inconsolata";
+}
+
+em {
+  font-family: "Libre Baskerville";
+}
+
+a {
+  font-family: "Inconsolata";
+  font-style: normal;
+}
+
+h1 {
+  font-size: 2em;
+  letter-spacing: -1px;
+}
+
+
+
+h1 a {
+  font-family: "Libre Baskerville";
+  color: lightgrey;
+}
+
+/* opacity .99 is a z-index trick */
+h1 a.active {
+  color: black;
+  opacity: .99;
+}
+
+article h2 {
+  font-style: italic;
+  padding-bottom: 1em;
+}
+
+article h3 {
+  font-style: italic;
+  padding-top: 0.5em;
+  font-size: 1.5em;
+}
+
+article p,
+article li, section p {
+  font-family: "aileronlight";
+  letter-spacing: 0.05em;
+  font-size: 1em;
+  line-height: 1.7;
+}
+
+footer {
+  padding-top: 1em;
+  font-style: italic;
+  font-family: "Libre Baskerville";
+}
+
+article {
+  padding-top: 1em;
+}
+
+aside {
+  white-space: nowrap;
+}
+
+main li a {
+  font-size: 1.2em;
+}
+
+article aside {
+  padding-top: 1em;
+  padding-bottom: 1em;
+}
+
+ul#postlist {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  font-size: 1.2em;
+}
+
+ul#postlist li {
+  padding-top: 2em;
+}
+
+section {
+  margin: 0 1em 0 1em;
+  padding-top: 2em;
+}
+
+
+section img {
+  display: block;
+  grid-area: image;
+  width: 180px;
+}
+
+section h2 {
+  display: block;
+  grid-area: title;
+}
+
+section ul {
+  grid-area: description;
+  list-style-type: none;
+  padding: 0;
+}
+
+@media screen and (min-width: 35rem) {
+  aside {
+    text-align: right;
+  }
+  ul#postlist li {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    padding-top: 2em;
+  }
+
+  section {
+    display: grid;
+    grid-column-gap: 10px;
+    grid-row-gap: 10px;
+    grid-template-columns: 1fr 2fr;
+    grid-template-rows: 3em 1fr;
+    grid-template-areas:
+    "title title"
+    "image description"
+  }
+
+  section p {
+    padding-left: 1em;
+  }
+
+  section ul {
+    padding-left: 1em;
+  }
+}

@@ -1,0 +1,75 @@
+==================================================================
+https://keybase.io/futurepaul
+--------------------------------------------------------------------
+
+I hereby claim:
+
+  * I am an admin of http://pauljmiller.com
+  * I am futurepaul (https://keybase.io/futurepaul) on keybase.
+  * I have a public key with fingerprint 2A20 458D 8270 EE78 2075  F488 6342 FAC3 3419 543C
+
+To do so, I am signing this object:
+
+{
+    "body": {
+        "key": {
+            "eldest_kid": "0120481ee4266421e1578b66f104515d9b6c515b33ae0484a235c498d39da92ddc1e0a",
+            "fingerprint": "2a20458d8270ee782075f4886342fac33419543c",
+            "host": "keybase.io",
+            "key_id": "6342fac33419543c",
+            "kid": "0101a10a37c4dd1a8be4fda6575677b287d956e9896f51349cdf7a7befad03efacc40a",
+            "uid": "4fb9221df83a435c2b86cf598a8b3a19",
+            "username": "futurepaul"
+        },
+        "service": {
+            "hostname": "pauljmiller.com",
+            "protocol": "http:"
+        },
+        "type": "web_service_binding",
+        "version": 1
+    },
+    "ctime": 1457818643,
+    "expire_in": 157680000,
+    "prev": "8b377df4743826cb73c66b85b14dfc6e7ae78e92bb300bf86c3e028c39c9fb1e",
+    "seqno": 9,
+    "tag": "signature"
+}
+
+which yields the signature:
+
+-----BEGIN PGP MESSAGE-----
+Version: Keybase OpenPGP v2.0.51
+Comment: https://keybase.io/crypto
+
+yMNyAnicbZJ7TBRHHMcPRG2hKA0StBbFtSaQXnRn30tp4dAgDQVpFVsj5dzdmYWF
+4+64F3c8hARtMEXqtZXSKHAB+4JIraaYHoKI1NaA6UMLBRGaFmLSBpqCFqJp2lmi
+/3X+mMnMfH+f+X5nZjByhSE8REl7cJXZsC85ZOjKKbdh/3R9dAUh26CPSKogitHy
+gCwQOV3mYg0SSQQJKJIRAEIMxXEMBRBgeUHmOBWQDAtYKMqcgkeZpiWEhYxE0azC
+iAKkRSiJFIQKQKREGAlVsxYgh92hWV0YS0kYywpQoHgSIV6gSJ5VGUHgaIZSJYWm
+GSCyDK3gwkKbU6/A5mTJibZrNryGJ+Zle/+jf+ybBBIgJZpXGAiBJMiIUaHEsTzL
+8bxMCTwUWQ6JgsipLKAZUYEqL/EyUiVI0rhXFGbZt3sZx6iySFEAqgItMTghJQuc
+orKigMG0BERd6EQOq1SCsFp1u9wOZJfcFqLKSOB1j6Yg/Wr1LI80+m5RiWaxIMd2
+xVaCAXaHzWVTbBa8Wehy2ZP0WpfProvLkGx+hDHLmhXiu8QFHuRwajYrkQSwUnFp
+Ohcw+H2AwDG0kUBeu+ZAZk1XsDwnkLjpxyAPRmLfPA9VhmdogeIUmacVjpMFVgYM
+VBUO8RJ+FiRSskyTpKziuDQiKUGhRUVUZYAIPVip1UYkidimVICRTq3AKunJiaqB
+K3lhhpBww6qVofofM4Q/GfX4551dGWX41Fa5NDSV4py8s3P6dG/g9s/V/O7IiX+H
+Iw8egF9tGazpStb2vOjZmBF5YOKfhlPWXqfj95sx9a313aXl3sGjdf3Fly4XrTZP
+9U/21O7ozF07PHBs8JnzakVXxlIgvNxnaj869eyX5Pk/qBsdMxkRprfWJ3yyKexB
+VO39zvJ1O8L27iyfiM6RXuh7Ltz423c+9uGYv6HaSy1k3yx9euaiHJqb3OSP6D8Z
+nDsSm9detybm67D3sxri/Eb4UVP81Zb86IvHQ1avyinyho13LEbPjpbc99JwTchM
+fGLBG4cNh9/Zf+/1XxaKCwpPd3Rfft6QF/Bnnynq+Ma5Lvjq4jk+vuaH2MbA3xFo
+3nQ9uRn2VQVz3HGm9taDwZRAaGJDprs/7nNivmzF5ncrJ1tLO0dmM6517drWf2h8
+KBBMCdnycZq1R9jafCdqpJP6ftWuzW92N3X5sto6u33Zf85vemn2yIXP9qTnzxzK
+47aCFvO3c6DpR0twcSl/49rpgd1zWfvqS0LLnoq/9/DE2/Gmseq2sDyxeyh9Ls7/
+Rfq1mB6m98ZrY74ZQ+T12kupqXtJY4tiSottLPTdyr1LHjs7lvzBraiT/sb1Tyzc
+bcvygOHRl8uiR8veK30lsTk7IbWyyuiv8wS3JUz9dOFED/2XfDszzph/rq6vxgzY
+XzPbW0di0JnUhHHg/RBu+A8r/Li4
+=RzHJ
+-----END PGP MESSAGE-----
+
+And finally, I am proving ownership of this host by posting or
+appending to this document.
+
+View my publicly-auditable identity here: https://keybase.io/futurepaul
+
+==================================================================
