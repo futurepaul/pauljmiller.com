@@ -54,6 +54,11 @@ body {
   font-family: "Inconsolata";
 }
 
+pre {
+  max-width: 35rem;
+  white-space: pre-wrap;
+}
+
 em {
   font-family: "Libre Baskerville";
 }
