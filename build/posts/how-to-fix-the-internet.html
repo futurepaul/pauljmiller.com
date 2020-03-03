@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>
+    
+    How to fix the internet
+    
+  </title>
+  <link rel="shortcut icon" href="/static/favicon.ico" />
+  <link rel="stylesheet" href="/static/normalize.css" />
+  <link rel="stylesheet" href="/static/main.css" />
+  <link rel="alternate" type="application/rss+xml" title="Paul's blog" href="/rss.xml" />
+</head>
+
+<body>
+  <header>
+    <h1><a class="active" href="https://pauljmiller.com">Paul's blog</a><a href="/projects.html">projects</a></h1>
+  </header>
+
+<main>
+  <article>
+    <h1>How to fix the internet</h1>
+    <h2>A subjective definition of fix</h2>
+
+    <p>Here's my idea in a nutshell: make it more like WordPress. Take any popular service you use from The Big Bad Tech Boys and make it more like WordPress.</p>
+<p>I'm giving you the least glamorous version of my idea up front to build trust. Is it working? Please don't leave. I understand that very few people love WordPress, especially not the people who work with it on a regular basis. WordPress is slow, old, bloated, complicated, and historically insecure.</p>
+<p>Also, WordPress powers roughly 30 percent of the top 10 million websites. So not only is my idea bad, it's also the status quo.</p>
+<p>But!</p>
+<p>What if stuff was more like WordPress?</p>
+<p>Let's say I want to start a new YouTube channel. But instead of starting it on YouTube, I start it à la WordPress.</p>
+<ol>
+<li>I buy a domain name, or <a href="https://elephantnames.com">use one I already own</a>.</li>
+<li>I set up hosting and connect it to my domain.</li>
+<li>I install a YouTube-like CMS on my server (instead of WordPress).</li>
+<li>I add videos, information, and design tweaks to the channel.</li>
+<li>Nobody ever discovers my videos because they're not on YouTube.</li>
+</ol>
+<p>Okay, so step five sounds disheartening. But we could solve this the way podcasts solved it: apps!</p>
+<p>See, podcasts are like WordPress blogs. In fact, many podcasts that are hosted DIY, instead of through a platform like SoundCloud or Anchor, publish via WordPress.</p>
+<p>A podcast is just:</p>
+<ol>
+<li>An RSS feed.</li>
+<li>A set of MP3s.</li>
+</ol>
+<p>It turns out, it's really straightforward to write an app that can subscribe to RSS feeds and play MP3 files. Hence the proliferation of podcast-listening apps.</p>
+<p>So if our WordPress-like YouTube replacement was just:</p>
+<ol>
+<li>An RSS feed.</li>
+<li>A set of videos.</li>
+</ol>
+<p>We'd be doing pretty well, yes?</p>
+<p>This is where we get to the inevitable: &quot;That sounds like an obvious idea. If it were also a <em>good</em> idea, it would've already been done. Therefore it must not be good.&quot;</p>
+<p>Maybe.</p>
+<p>Or perhaps we haven't had the incentive to self-publish our own video channels before now. YouTube was a good enough. The upsides, like discoverability and monetization, far outweighed the downsides: not owning your own distribution, a capricious algorithm, Google's discretion as to what's appropriate.</p>
+<p>Hosting the videos is expensive, especially if we want anything close to the low latency and high quality of YouTube. And there's very little incentive to build a high quality app for these video channels because they don't exist (a classic chicken / egg scenario).</p>
+<p>Also, for some reason, Google is the only company on earth with the budget to create a really good video player for the web.</p>
+<h3>Fast-forward to the year 2025</h3>
+<p>There are many well-established content types. Just like .txt / .doc / .png, except for things like .tweet, .podcast, .video, .blog.</p>
+<p>When I want to publish some content, let's say a video, I use my favorite app to package it into a standard .video file. That file is basically just the real video file, plus any metadata the .video format requires, such as title, description, etc.</p>
+<p>I publish &quot;paul-minecraft-lets-play-episode-4190.video&quot; to my home server. My home server is just a black box in my closet that's plugged into power and ethernet.</p>
+<p>My home server updates a list of .video files with the hash of my latest .video file and serves this file (like an RSS feed, except in the year 2025 maybe we don't use XML anymore). If I'm a very popular video creator, my home server seeds the video to a bunch of CDNs that serve the bulk of traffic. If I'm very controversial (I always dig straight down), perhaps my videos are only torrented. Or if only my mom watches my Let's Plays, she can probably load the video directly from my home server without a problem.</p>
+<p>A subscriber is notified of my upload on her phone, because in this fantastical future, if you subscribe and click the bell icon, notifications actually work. She opens her app of choice for consuming this content. It might be an app focused only on .video subscriptions, or an app that can handle many different content type feeds.</p>
+<p>If she likes the video, she can click the &quot;fav&quot; button and leave a comment, just like in the year 2019. But her fav and her comment aren't published to my server, or to a central server like YouTube, they're published to her server. A .comment file, a .liked index.</p>
+<p>Insofar as the videos and other content she enjoys are presented to her via algorithm, it's an algorithm she chose herself that runs on her own server against her own data.</p>
+<p>Someone who follows her .video channel, or her .blog channel, might be more likely to see my video in the &quot;Other recommended channels&quot; list. Or not! It's up to her. My server is simply notified that she's published a comment, and I can publish a reference to her comment without hosting it myself.</p>
+<h3>Some notes of clarification on what the future's like</h3>
+<p>I think what we'll see very clearly in hindsight is that when we published our content on other people's servers, it always went bad. Instagram's algo made us sad. YouTube's algo made us mad. Twitter's algo mad us sad AND mad. Google Photos algo, it turned out, made us easily tracked and controlled by totalitarian governments. Oops!</p>
+<p>Self-hosting will be the &quot;difficult&quot; and &quot;cumbersome&quot; option for a while, but by the year 2025 it will be easier than the centralized services are. Think about it: have you ever tried to upload a YouTube video? There are a ton of options, and the interface is kind of annoying, and it's a many-step process. This is because YouTube has to be designed to be a jack of all uploading trades, master of none. But when self-hosting is mature and common, you'll be able to pay for a highly specific app that streamlines the experience to match your exact needs. If you don't want to pay for a high-end app there will likely be a more general, harder-to-use, free and open source option as well.</p>
+<p>And: any things that <em>are</em> difficult about self-hosting are directly related to self-determination. &quot;Nobody is obliged to host your shitty Let's Play. It's two gigabytes. You swear a lot, so we can't use it to sell soap. Four people watch it. And three of those people hit the thumbs down button.&quot; Correct.</p>
+<p>What about popular, non-controversial content? Does this system work for that? &quot;Caching is a hard problem&quot; is something you might've heard. I don't think we'll have a perfectly decentralized internet by 2025 that can outpace high quality CDN services. But I do think we'll have new ways to pay CDNs for their service. A big company who wants its detergent ad seen by millions with a low buffer time might pay CDNs up front. But barely monetized user-created content might be mirrored by CDNs in exchange for some kind of per-use payment from viewers.</p>
+<p>Standardizing on different content types is obviously a whole can of worms in itself. It does seem to be an improvement, however, on the current situation, where we have basically three main &quot;open&quot; content types for publishing:</p>
+<ol>
+<li>RSS (for blogs)</li>
+<li>Apple's bastardized RSS (for podcasts)</li>
+<li>WWW, which is possibly the most complicated spec of all time.</li>
+</ol>
+<p>I think WWW's ongoing role will be for discovering new content types, for interactive media, and for application distribution (maybe). But for well-established content types I think it adds way too much complication and bloat. If you think about it, most of what proprietary systems add to well-established content types is a way to consume them <em>without</em> the pain and suffering of WWW. Medium, Twitter, Google Photos, YouTube, etc. Of course, in all of these cases, can serve as a completely fine fallback when you don't have the appropriate app.</p>
+<h3>How do we get there from here?</h3>
+<p>If I knew exactly what the next step was, I'd be foolish to not be working on it. And yet look at me: blogging! I think, perhaps, creating easy-to-use self publishing systems (that put content on a creator's own Digital Ocean server, while we wait for the black box home server to arrive) is the right thing to do.</p>
+<p>But do the content types need to exist first? Should I create a content type for &quot;.blog&quot; (probably Markdown with some TOML on top) and see if anybody likes using it? I tried to make a podcast generator entirely based on MP3 metadata but that was pretty difficult and probably not the right approach.</p>
+<p>Should hosting be stateful, like a WordPress blog with a MySQL backend, or stateless, like a Hugo blog built with a static site generator? For plain text blogs, the static site generator works great, but if video files and images are involved we might want some sort of object storage?</p>
+<p>Do the apps that consume this content need to truly know about the different content types? Could we do all of this by bastardizing RSS, like podcasts did?</p>
+<p>Should I be looking into Activity Streams? Or is that just WWW being needlessly complicated again?</p>
+<p>What we need:</p>
+<ol>
+<li>Tools to package content for distribution.</li>
+<li>Services to self-publish that content with minimal effort.</li>
+<li>Apps to subscribe to channels and enjoy the content.</li>
+</ol>
+<p>And, hopefully, all three steps will involve standard protocols and formats.</p>
+<p>Then, once all of this works, we can build toward feature parity with existing services by closing the loop: the app you use to enjoy video channels can also publish comments to your home server, which are then somehow linked to by the video publisher's server. It gets dicey and unsolved-problem-ey!</p>
+<p>All of this without monetizing via scam or raising money in such a way that incentivizes centralization. Most Web 3.0 efforts, sadly, fail this test. Maybe I should be taking <a href="https://solid.inrupt.com/how-it-works">Sir Tim Berners-Lee's Solid</a> more seriously, but it feels needlessly alien to me.</p>
+<p>So, please hit me up on Twitter and let me know what you think, let me know if you want to help, and let me know if you have any hot tips.</p>
+<p>I think a better internet is possible. It should be more like WordPress, I think. As long as it isn't literally WordPress. Because it should be more app-ish. Also, I'm not going to bother to learn PHP after all these years.</p>
+
+
+    <aside>Posted on June 20, 2019</aside>
+
+  </article>
+
+</main>
+
+<footer>
+  <p>
+    This is my blog. Thank you for being here.
+  </p>
+</footer>
+</body>
+
+</html>

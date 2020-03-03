@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>
+    
+    Three projects is one less than four
+    
+  </title>
+  <link rel="shortcut icon" href="/static/favicon.ico" />
+  <link rel="stylesheet" href="/static/normalize.css" />
+  <link rel="stylesheet" href="/static/main.css" />
+  <link rel="alternate" type="application/rss+xml" title="Paul's blog" href="/rss.xml" />
+</head>
+
+<body>
+  <header>
+    <h1><a class="active" href="https://pauljmiller.com">Paul's blog</a><a href="/projects.html">projects</a></h1>
+  </header>
+
+<main>
+  <article>
+    <h1>Three projects is one less than four</h1>
+    <h2>This post is a form of self-assessment</h2>
+
+    <p>Last month <a href="https://pauljmiller.com/posts/four-projects-in-may.html">I created a plan for myself</a>: instead of just tinkering with various projects, I would bring four projects to a point of portfolio-worthiness. One project a week.</p>
+<p>The result? I did three of them! And, also, did other things as well. Here's what went right, and what went wrong.</p>
+<h3>Code on tape</h3>
+<p>The moral of this story is: write your own components if you can. I've always approached programming as &quot;the idiot in the room.&quot; That is, I assume everyone else's GitHub code is so much better than mine that I'd be a <em>fool</em> to try and write my own implementation.</p>
+<p>But, in this case, it turned out way more efficacious — and, more importantly, more educational — to write my own component for wrapping the <a href="https://github.com/Microsoft/monaco-editor">Monaco Editor</a>. And a hook to <a href="https://codesandbox.io/s/81zkxw8qnl">record audio</a>. I still got stuck a lot, and still copied a lot of code from GitHub. Also, that hook <a href="https://twitter.com/dan_abramov/status/1126264624326823942">ended up being fixed by React's own Dan Abramov</a>, which feels a bit like cheating, but...</p>
+<p>The moral is still the same! Writing, or at least attempting to write, my own components instead of instantly reaching for whatever's hot on npm lead me to much better understanding of what I was doing, and therefore more steady progress instead of eternal stuckness.</p>
+<p>Unfortunately, while I got Code on tape to a working state, I didn't get it to an easily shareable state. Maybe I'll do that someday! This knocks my number of &quot;finished&quot; projects down to three, but of course &quot;finished&quot; is a very subjective thing.</p>
+<p>Oh, one more sidenote: I did state management in Overmind because it seemed to offer similar advantages to Redux but with much less boilerplate. I think that proved to be true!</p>
+<p>(Github: <a href="https://github.com/futurepaul/code-on-tape/tree/overmind">Code on tape</a>)</p>
+<h3>Calculator 2</h3>
+<p>This was easily my favorite project to build. Like with Code on tape, I had built a version of it before in React, but decided to rewrite it in Svelte 3 this time. And, because Svelte was such a breeze to work with, I ended up with more time to achieve two nice-to-haves:</p>
+<ol>
+<li>
+<p>Using Rust to do math. My earlier versions of Calculator 2 had used some random Javascript library to evaluate the math expressions. But now I'm using <a href="https://crates.io/crates/rsc">RSC, a Rust crate</a>, for which I created a simple WASM wrapper. It works, it feels fast and &quot;solid,&quot; if that's worth anything. And, also: it works!</p>
+</li>
+<li>
+<p>Because of Svelte and WASM, I was already dabbling in Webpack, which led me to make the boldest move of all: I wrote my own Webpack loader to turn mathematical notation into SVG. Earlier versions of Calculator 2 had used the excellent MathJax at runtime to accomplish the same thing. But, thanks to my Webpack loader I'm able to run MathJax at compile-time, saving gobs of Javascript at load-time and making everything just feel better.</p>
+</li>
+</ol>
+<p>(Github: <a href="https://github.com/futurepaul/calculator-2">Calculator 2 on Github</a>)</p>
+<h3>Fragment Notes</h3>
+<p>Again I switched to Svelte 3 for the frontend, instead of the weird non-React view library I had been using. I also rearranged the project into three pieces: the pure Rust library (that does the full-text search, mostly a ripgrep wrapper), the native module library (that wraps the Rust library with <a href="https://neon-bindings.com/">Neon Bindings</a> to make it work on Node), and the Electron app. This worked very well.</p>
+<p>Except.</p>
+<p>There's something I just don't really understand about how Node compiles native modules. When I try to compile a &quot;release&quot; version of my app to run as a binary, it ends up gigabytes big and insanely slow. But when I run <code>npm run start</code> from my project folder it works fine! And I find the build process so difficult, obtuse, and random, that I have zero motivation right now to track down a solution.</p>
+<p>So Fragment Notes is now a working product that I use for my own notes-searching purposes. But I don't know how to package and share it, unfortunately.</p>
+<p>(Github: <a href="https://github.com/futurepaul/fragment">Fragment Notes</a>)</p>
+<h3>My Own Personal Blog</h3>
+<p>Instead of totally revamping the My Own Personal Blog project to be the static site generator for normies, I merely added the functionality necessary to <a href="https://pauljmiller.com/projects.html">add the projects page</a>. So, in a way, this is still undone. That said, I really love using my own static site generator, and am always glad I chose to roll my own instead of attempting sticking with Hugo.</p>
+<p>(Github: <a href="https://github.com/futurepaul/my-own-personal-blog/tree/genericify">My Own Personal Blog</a>)</p>
+<h3>svg-to-piet</h3>
+<p>Woah, what's this? This wasn't in the original plan!</p>
+<p>That's right, during this month of working seriously on my own projects I also got extremely involved in the Piet / Druid community. My biggest work in this regard was a collab with <a href="https://github.com/cbrewster">Connor Brewster</a> to build a <a href="https://github.com/futurepaul/piet/tree/master/piet-raqote">Piet backend with Raqote</a>. That is to say, Piet is a API for 2D graphics, Raqote does the grunt work of laying down pixels, and what we wrote was the adapter between them.</p>
+<p>While piet-raqote is mostly an educational project, what I'm really excited about is <a href="https://github.com/xi-editor/druid">Druid</a>, which is a GUI framework built on Piet. With Druid I can make real, native apps using Rust — for instance, once Druid has the necessary functionality, I will be re-writing Fragment in Druid. Sorry, Electron, but you know this day would come eventually!</p>
+<p>To help with some Druid development I was doing, I made svg-to-piet, which is a simple utility to convert an SVG into Piet draw calls.</p>
+<p>If I had to pick a programming job out of a hat, I hope it would be a job that involved more or less straightforward data transformation of the kind that svg-to-piet turned out to be.</p>
+<p>It wouldn't, however, involve writing Rust macros, which was the actual hard part of svg-to-piet.</p>
+<p>(Github: <a href="https://github.com/futurepaul/svg-to-piet">svg-to-piet</a>)</p>
+<h3>What's next?</h3>
+<p>I can't decide, tbh. This month was a great idea. I ended up with a portfolio I'm proud to share, and I learned a lot in each individual project. But I don't have another four projects of a similar character sitting on my back burner. I have a bunch of vague ideas that require education and exploration, which is a much more meandering process.</p>
+<p>If you'd like to help me pick my next project, <a href="mailto:paul@pauljmiller.com">perhaps consider hiring me</a>!</p>
+
+
+    <aside>Posted on June 26, 2019</aside>
+
+  </article>
+
+</main>
+
+<footer>
+  <p>
+    This is my blog. Thank you for being here.
+  </p>
+</footer>
+</body>
+
+</html>

@@ -9,7 +9,11 @@
     <description>Paul's blog</description>
     <link>https://pauljmiller.com</link>
     
-    <lastBuildDate>Tue,  4 Jun 2019 00:45:59 +0000</lastBuildDate>
+    <lastBuildDate>Wed, 23 Oct 2019 00:45:59 +0000</lastBuildDate>
+    
+    
+    
+    
     
     
     
@@ -21,6 +25,653 @@
 
     <item>
       <title>
+        Building a widget for Druid
+      </title>
+      <link>https://pauljmiller.com/posts/druid-widget-tutorial.html</link>
+      <pubDate>Wed, 23 Oct 2019 00:45:59 +0000</pubDate>
+      <guid>https://pauljmiller.com/posts/druid-widget-tutorial.html</guid>
+      <description>
+        <![CDATA[<p>Want to build a desktop app? You probably want to use Electron or Qt or GTK or a native toolkit.</p>
+<p>Want to build a thing that you could (maybe) <em>someday</em> use to build a native desktop app? <a href="https://github.com/xi-editor/druid">Contribute to Druid</a>!</p>
+<p>Druid is a work-in-progress, open source &quot;data-oriented Rust UI design toolkit.&quot; You can use it right now to build <em>very</em> feature-incomplete desktop applications for macOS, Windows, and Linux.</p>
+<p>For most of 2019 I've been contributing to Druid in the form of widgets. Exciting UI elements like: a button with rounded corners! A progress bar with rounded corners! A checkbox with rounded corners! A textbox with rounded corners!</p>
+<p>It's not much, but it's honest work.</p>
+<p>One thing I'm really enjoying about Druid is that at the widget level I control every pixel. Druid is a UI framework, sort of like React is for the web, but it uses a 2D graphics library called Piet to actually put pixels on the screen. Drawing my own widgets from scratch, instead of just styling someone else's widgets, was a big conceptual leap at first for me, but it quickly turned into an extremely satisfying activity.</p>
+<p>So, I'd like to walk you through the widget creation process. Perhaps you too will adopt this widget-creation hobby and help me fill out Druid's palette of default elements! I think we'd all like to live in a world where an open source project like Druid can build feature-<em>complete</em> desktop applications, but first <em>somebody</em> has to build that world.</p>
+<h2>1. What is a widget?</h2>
+<p>In Druid, &quot;Widget&quot; is a trait. So to make a new kind of widget, you just make a new type and then implement <code>Widget</code> on it.</p>
+<p>Let’s use a color picker widget as an example:</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">struct </span><span style="color:#323232;">ColorPicker;
+</span><span style="color:#323232;">
+</span><span style="font-weight:bold;color:#a71d5d;">impl </span><span style="color:#323232;">Widget </span><span style="font-weight:bold;color:#a71d5d;">for </span><span style="color:#323232;">ColorPicker {
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">fn </span><span style="font-weight:bold;color:#795da3;">paint</span><span style="color:#323232;">(...) {</span><span style="font-weight:bold;color:#a71d5d;">...</span><span style="color:#323232;">}
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">fn </span><span style="font-weight:bold;color:#795da3;">layout</span><span style="color:#323232;">(...) {</span><span style="font-weight:bold;color:#a71d5d;">...</span><span style="color:#323232;">}
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">fn </span><span style="font-weight:bold;color:#795da3;">event</span><span style="color:#323232;">(...) {</span><span style="font-weight:bold;color:#a71d5d;">...</span><span style="color:#323232;">}
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">fn </span><span style="font-weight:bold;color:#795da3;">update</span><span style="color:#323232;">(...) {</span><span style="font-weight:bold;color:#a71d5d;">...</span><span style="color:#323232;">}
+</span><span style="color:#323232;">}
+</span></pre>
+<p>And we're done!</p>
+<p>To use our <code>ColorPicker</code> widget, we include the widget as part of a widget hierarchy. Then it's Druid's job to send events to widgets as appropriate and to update widgets as appropriate with new data when the app's state changes.</p>
+<p>The widget's methods are generally are called in this order (it’s possible for a widget to receive <code>update</code> without ever receiving <code>event</code>):</p>
+<pre style="white-space: pre-wrap;">event -&gt; update -&gt; layout -&gt; paint
+</pre>
+<p>So an <code>event</code>, like a mouse clicking on our widget, could potentially cause a data <code>update</code>, and then we'll position and size the widget correctly with the <code>layout</code> method, and finally <code>paint</code> the widget to the screen.</p>
+<h2>2. Getting started</h2>
+<p>A great way to get started working on widgets in Druid is to clone the whole <a href="https://github.com/xi-editor/druid">repo</a> and then make a copy of <code>custom_widget.rs</code> in the examples directory. We'll call it <code>color_picker.rs</code>.</p>
+<p>So, in our case:</p>
+<pre style="white-space: pre-wrap;">cargo run --example color_picker
+</pre>
+<p>(If you're on macOS you'll need to <code>brew install cairo</code> first.)</p>
+<p>You should end up opening a window that looks something like this:
+<img src="../static/images/dw_1.png" alt="custom widget example" /></p>
+<p>This example has some minimal in-line documentation, so feel free to experiment.</p>
+<p>If it helps your mental model, here's what's happening when we launch this app:</p>
+<p>The <code>AppLauncher</code> is given a <code>WindowDesc</code> which holds a root widget called CustomWidget. At launch the app's initial state is the String <code>Druid + Piet</code>, which is passed to the widget tree. When we resize the window, the size constraint passed to CustomWidget is updated, and so the widget is redrawn to match its new size.</p>
+<h2>3. Painting with Piet</h2>
+<p>Before we think too hard about our data model (famous last words), let's get our own pixels on the screen.</p>
+<p>I think we should do a HSL color picker. This widget we're building can display and control the SL (Saturation and Lightness), and then we can add a slider to the app to control H (Hue).</p>
+<p>HSL can be represented as three floats in the range (0.0, 1.0). But Piet's <code>Color</code> type is RGBA under the hood, so we need to do some converting before we draw the color on the screen.</p>
+<p>Here's a handy HSL to RGB converter I just had laying around. Feel free to copy and paste because this isn't really the focus of this tutorial!</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">fn </span><span style="font-weight:bold;color:#795da3;">hue_to_rgb</span><span style="color:#323232;">(p: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">, q: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">, t: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">) -&gt; </span><span style="font-weight:bold;color:#a71d5d;">f64 </span><span style="color:#323232;">{
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">let mut</span><span style="color:#323232;"> t </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> t;
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">if</span><span style="color:#323232;"> t </span><span style="font-weight:bold;color:#a71d5d;">&lt; </span><span style="color:#0086b3;">0. </span><span style="color:#323232;">{
+</span><span style="color:#323232;">        </span><span style="color:#323232;">t </span><span style="font-weight:bold;color:#a71d5d;">+= </span><span style="color:#0086b3;">1.
+</span><span style="color:#323232;">    </span><span style="color:#323232;">}
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">if</span><span style="color:#323232;"> t </span><span style="font-weight:bold;color:#a71d5d;">&gt; </span><span style="color:#0086b3;">1. </span><span style="color:#323232;">{
+</span><span style="color:#323232;">        </span><span style="color:#323232;">t </span><span style="font-weight:bold;color:#a71d5d;">-= </span><span style="color:#0086b3;">1.
+</span><span style="color:#323232;">    </span><span style="color:#323232;">};
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">if</span><span style="color:#323232;"> t </span><span style="font-weight:bold;color:#a71d5d;">&lt; </span><span style="color:#0086b3;">1. </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#0086b3;">6. </span><span style="color:#323232;">{
+</span><span style="color:#323232;">        </span><span style="font-weight:bold;color:#a71d5d;">return</span><span style="color:#323232;"> p </span><span style="font-weight:bold;color:#a71d5d;">+ </span><span style="color:#323232;">(q </span><span style="font-weight:bold;color:#a71d5d;">-</span><span style="color:#323232;"> p) </span><span style="font-weight:bold;color:#a71d5d;">* </span><span style="color:#0086b3;">6. </span><span style="font-weight:bold;color:#a71d5d;">*</span><span style="color:#323232;"> t;
+</span><span style="color:#323232;">    </span><span style="color:#323232;">}
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">if</span><span style="color:#323232;"> t </span><span style="font-weight:bold;color:#a71d5d;">&lt; </span><span style="color:#0086b3;">1. </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#0086b3;">2. </span><span style="color:#323232;">{
+</span><span style="color:#323232;">        </span><span style="font-weight:bold;color:#a71d5d;">return</span><span style="color:#323232;"> q;
+</span><span style="color:#323232;">    </span><span style="color:#323232;">}
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">if</span><span style="color:#323232;"> t </span><span style="font-weight:bold;color:#a71d5d;">&lt; </span><span style="color:#0086b3;">2. </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#0086b3;">3. </span><span style="color:#323232;">{
+</span><span style="color:#323232;">        </span><span style="font-weight:bold;color:#a71d5d;">return</span><span style="color:#323232;"> p </span><span style="font-weight:bold;color:#a71d5d;">+ </span><span style="color:#323232;">(q </span><span style="font-weight:bold;color:#a71d5d;">-</span><span style="color:#323232;"> p) </span><span style="font-weight:bold;color:#a71d5d;">* </span><span style="color:#323232;">(</span><span style="color:#0086b3;">2. </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#0086b3;">3. </span><span style="font-weight:bold;color:#a71d5d;">-</span><span style="color:#323232;"> t) </span><span style="font-weight:bold;color:#a71d5d;">* </span><span style="color:#0086b3;">6.</span><span style="color:#323232;">;
+</span><span style="color:#323232;">    </span><span style="color:#323232;">}
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">return</span><span style="color:#323232;"> p;
+</span><span style="color:#323232;">}
+</span><span style="color:#323232;">
+</span><span style="font-weight:bold;color:#a71d5d;">fn </span><span style="font-weight:bold;color:#795da3;">hsl_to_rgb</span><span style="color:#323232;">(h: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">, s: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">, l: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">) -&gt; (</span><span style="font-weight:bold;color:#a71d5d;">u8</span><span style="color:#323232;">, </span><span style="font-weight:bold;color:#a71d5d;">u8</span><span style="color:#323232;">, </span><span style="font-weight:bold;color:#a71d5d;">u8</span><span style="color:#323232;">) {
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> r;
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> g;
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> b;
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">if</span><span style="color:#323232;"> s </span><span style="font-weight:bold;color:#a71d5d;">== </span><span style="color:#0086b3;">0.0 </span><span style="color:#323232;">{
+</span><span style="color:#323232;">        </span><span style="color:#323232;">r </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> l;
+</span><span style="color:#323232;">        </span><span style="color:#323232;">g </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> l;
+</span><span style="color:#323232;">        </span><span style="color:#323232;">b </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> l; </span><span style="font-style:italic;color:#969896;">// achromatic
+</span><span style="color:#323232;">    </span><span style="color:#323232;">} </span><span style="font-weight:bold;color:#a71d5d;">else </span><span style="color:#323232;">{
+</span><span style="color:#323232;">        </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> q </span><span style="font-weight:bold;color:#a71d5d;">= if</span><span style="color:#323232;"> l </span><span style="font-weight:bold;color:#a71d5d;">&lt; </span><span style="color:#0086b3;">0.5 </span><span style="color:#323232;">{ l </span><span style="font-weight:bold;color:#a71d5d;">* </span><span style="color:#323232;">(</span><span style="color:#0086b3;">1. </span><span style="font-weight:bold;color:#a71d5d;">+</span><span style="color:#323232;"> s) } </span><span style="font-weight:bold;color:#a71d5d;">else </span><span style="color:#323232;">{ l </span><span style="font-weight:bold;color:#a71d5d;">+</span><span style="color:#323232;"> s </span><span style="font-weight:bold;color:#a71d5d;">-</span><span style="color:#323232;"> l </span><span style="font-weight:bold;color:#a71d5d;">*</span><span style="color:#323232;"> s };
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">        </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> p </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#0086b3;">2. </span><span style="font-weight:bold;color:#a71d5d;">*</span><span style="color:#323232;"> l </span><span style="font-weight:bold;color:#a71d5d;">-</span><span style="color:#323232;"> q;
+</span><span style="color:#323232;">        </span><span style="color:#323232;">r </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#62a35c;">hue_to_rgb</span><span style="color:#323232;">(p, q, h </span><span style="font-weight:bold;color:#a71d5d;">+ </span><span style="color:#0086b3;">1. </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#0086b3;">3.</span><span style="color:#323232;">);
+</span><span style="color:#323232;">        </span><span style="color:#323232;">g </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#62a35c;">hue_to_rgb</span><span style="color:#323232;">(p, q, h);
+</span><span style="color:#323232;">        </span><span style="color:#323232;">b </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#62a35c;">hue_to_rgb</span><span style="color:#323232;">(p, q, h </span><span style="font-weight:bold;color:#a71d5d;">- </span><span style="color:#0086b3;">1. </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#0086b3;">3.</span><span style="color:#323232;">);
+</span><span style="color:#323232;">    </span><span style="color:#323232;">}
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">return </span><span style="color:#323232;">(
+</span><span style="color:#323232;">        </span><span style="color:#323232;">(r </span><span style="font-weight:bold;color:#a71d5d;">* </span><span style="color:#0086b3;">255.</span><span style="color:#323232;">).</span><span style="color:#62a35c;">round</span><span style="color:#323232;">() </span><span style="font-weight:bold;color:#a71d5d;">as u8</span><span style="color:#323232;">,
+</span><span style="color:#323232;">        </span><span style="color:#323232;">(g </span><span style="font-weight:bold;color:#a71d5d;">* </span><span style="color:#0086b3;">255.</span><span style="color:#323232;">).</span><span style="color:#62a35c;">round</span><span style="color:#323232;">() </span><span style="font-weight:bold;color:#a71d5d;">as u8</span><span style="color:#323232;">,
+</span><span style="color:#323232;">        </span><span style="color:#323232;">(b </span><span style="font-weight:bold;color:#a71d5d;">* </span><span style="color:#0086b3;">255.</span><span style="color:#323232;">).</span><span style="color:#62a35c;">round</span><span style="color:#323232;">() </span><span style="font-weight:bold;color:#a71d5d;">as u8</span><span style="color:#323232;">,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">);
+</span><span style="color:#323232;">}
+</span></pre>
+<p>Let's draw a color on the screen as a sanity check.</p>
+<p>Clear out the widget impl's <code>paint</code> method and put this in instead:</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">fn </span><span style="font-weight:bold;color:#795da3;">paint</span><span style="color:#323232;">(
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">&amp;mut </span><span style="color:#323232;">self,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">paint_ctx: </span><span style="font-weight:bold;color:#a71d5d;">&amp;mut</span><span style="color:#323232;"> PaintCtx,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">base_state: </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">BaseState,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">data: </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">String,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">_env: </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">Env,
+</span><span style="color:#323232;">) {
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> rgb </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#62a35c;">hsl_to_rgb</span><span style="color:#323232;">(</span><span style="color:#0086b3;">0.5</span><span style="color:#323232;">, </span><span style="color:#0086b3;">0.5</span><span style="color:#323232;">, </span><span style="color:#0086b3;">0.5</span><span style="color:#323232;">);
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> rect </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">Rect::from_origin_size(Point::</span><span style="color:#0086b3;">ORIGIN</span><span style="color:#323232;">, base_state.</span><span style="color:#62a35c;">size</span><span style="color:#323232;">());
+</span><span style="color:#323232;">    </span><span style="color:#323232;">paint_ctx.</span><span style="color:#62a35c;">fill</span><span style="color:#323232;">(rect, </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">Color::rgb8(rgb.</span><span style="color:#0086b3;">0</span><span style="color:#323232;">, rgb.</span><span style="color:#0086b3;">1</span><span style="color:#323232;">, rgb.</span><span style="color:#0086b3;">2</span><span style="color:#323232;">));
+</span><span style="color:#323232;">}
+</span></pre>
+<p>If everything goes well, you may discover a marvelous new shade of... blue? I think that's in the blue family.</p>
+<p><img src="../static/images/dw_2.png" alt="delightful blue widget" /></p>
+<p>Now let's draw our SL by repurposing that suspiciously convenient <code>make_image_data()</code> function at the bottom of this file.</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">fn </span><span style="font-weight:bold;color:#795da3;">make_sl_image</span><span style="color:#323232;">(width: </span><span style="font-weight:bold;color:#a71d5d;">usize</span><span style="color:#323232;">, height: </span><span style="font-weight:bold;color:#a71d5d;">usize</span><span style="color:#323232;">, hue: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">) -&gt; Vec&lt;</span><span style="font-weight:bold;color:#a71d5d;">u8</span><span style="color:#323232;">&gt; {
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">let mut</span><span style="color:#323232;"> image_data </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">vec![</span><span style="color:#0086b3;">0</span><span style="color:#323232;">; width </span><span style="font-weight:bold;color:#a71d5d;">*</span><span style="color:#323232;"> height </span><span style="font-weight:bold;color:#a71d5d;">* </span><span style="color:#0086b3;">4</span><span style="color:#323232;">];
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">for</span><span style="color:#323232;"> y </span><span style="font-weight:bold;color:#a71d5d;">in </span><span style="color:#0086b3;">0</span><span style="font-weight:bold;color:#a71d5d;">..</span><span style="color:#323232;">height {
+</span><span style="color:#323232;">        </span><span style="font-weight:bold;color:#a71d5d;">for</span><span style="color:#323232;"> x </span><span style="font-weight:bold;color:#a71d5d;">in </span><span style="color:#0086b3;">0</span><span style="font-weight:bold;color:#a71d5d;">..</span><span style="color:#323232;">width {
+</span><span style="color:#323232;">            </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> ix </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">(y </span><span style="font-weight:bold;color:#a71d5d;">*</span><span style="color:#323232;"> width </span><span style="font-weight:bold;color:#a71d5d;">+</span><span style="color:#323232;"> x) </span><span style="font-weight:bold;color:#a71d5d;">* </span><span style="color:#0086b3;">4</span><span style="color:#323232;">;
+</span><span style="color:#323232;">            </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> x_ratio </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> x </span><span style="font-weight:bold;color:#a71d5d;">as f64 /</span><span style="color:#323232;"> width </span><span style="font-weight:bold;color:#a71d5d;">as f64</span><span style="color:#323232;">;
+</span><span style="color:#323232;">            </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> y_ratio </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> y </span><span style="font-weight:bold;color:#a71d5d;">as f64 /</span><span style="color:#323232;"> width </span><span style="font-weight:bold;color:#a71d5d;">as f64</span><span style="color:#323232;">;
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">            </span><span style="font-style:italic;color:#969896;">// Where the magic happens
+</span><span style="color:#323232;">            </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> color </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#62a35c;">hsl_to_rgb</span><span style="color:#323232;">(hue, x_ratio, y_ratio);
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">            </span><span style="color:#323232;">image_data[ix </span><span style="font-weight:bold;color:#a71d5d;">+ </span><span style="color:#0086b3;">0</span><span style="color:#323232;">] </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> color.</span><span style="color:#0086b3;">0</span><span style="color:#323232;">;
+</span><span style="color:#323232;">            </span><span style="color:#323232;">image_data[ix </span><span style="font-weight:bold;color:#a71d5d;">+ </span><span style="color:#0086b3;">1</span><span style="color:#323232;">] </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> color.</span><span style="color:#0086b3;">1</span><span style="color:#323232;">;
+</span><span style="color:#323232;">            </span><span style="color:#323232;">image_data[ix </span><span style="font-weight:bold;color:#a71d5d;">+ </span><span style="color:#0086b3;">2</span><span style="color:#323232;">] </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> color.</span><span style="color:#0086b3;">2</span><span style="color:#323232;">;
+</span><span style="color:#323232;">            </span><span style="color:#323232;">image_data[ix </span><span style="font-weight:bold;color:#a71d5d;">+ </span><span style="color:#0086b3;">3</span><span style="color:#323232;">] </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#0086b3;">255
+</span><span style="color:#323232;">        </span><span style="color:#323232;">}
+</span><span style="color:#323232;">    </span><span style="color:#323232;">}
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">    </span><span style="color:#323232;">image_data
+</span><span style="color:#323232;">}
+</span></pre>
+<p>I promise you that most of Piet isn't creating your own <code>Vec&lt;u8&gt;</code> image buffers from scratch, but that doesn't mean you can't enjoy these occasions.</p>
+<p>Now let's return to the paint method and draw the image:</p>
+<pre style="background-color: #eff0f1;"><span style="font-style:italic;color:#969896;">// We&#39;re generating a 256 by 256 pixels image, with a constant hue of 0.5
+</span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> image_data </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#62a35c;">make_sl_image</span><span style="color:#323232;">(</span><span style="color:#0086b3;">256</span><span style="color:#323232;">, </span><span style="color:#0086b3;">256</span><span style="color:#323232;">, </span><span style="color:#0086b3;">0.5</span><span style="color:#323232;">);
+</span><span style="color:#323232;">
+</span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> image </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> paint_ctx
+</span><span style="color:#323232;">    </span><span style="color:#323232;">.</span><span style="color:#62a35c;">make_image</span><span style="color:#323232;">(</span><span style="color:#0086b3;">256</span><span style="color:#323232;">, </span><span style="color:#0086b3;">256</span><span style="color:#323232;">, </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">image_data, ImageFormat::RgbaSeparate)
+</span><span style="color:#323232;">    </span><span style="color:#323232;">.</span><span style="color:#62a35c;">unwrap</span><span style="color:#323232;">();
+</span><span style="color:#323232;">
+</span><span style="font-style:italic;color:#969896;">// When piet draws our image it will stretch it automatically.
+</span><span style="font-style:italic;color:#969896;">// We&#39;ll fix this later by giving our widget a fixed size.
+</span><span style="color:#323232;">paint_ctx.</span><span style="color:#62a35c;">draw_image</span><span style="color:#323232;">(
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">image,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">Rect::from_origin_size(Point::</span><span style="color:#0086b3;">ORIGIN</span><span style="color:#323232;">, base_state.</span><span style="color:#62a35c;">size</span><span style="color:#323232;">()),
+</span><span style="color:#323232;">    </span><span style="color:#323232;">InterpolationMode::Bilinear,
+</span><span style="color:#323232;">);
+</span></pre>
+<p>Okay, so we're the king of gradients now. But how about interactivity?</p>
+<h2>4. Paint a rectangle</h2>
+<p>To put the &quot;picker&quot; in color picker, let's draw a rectangular cursor that we can move around.</p>
+<p>Our cursor will need an x and y coordinate to be drawn at, and that will require some modicum of statefulness. For now, let's make it private to our widget.</p>
+<p>If you haven't renamed the <code>CustomWidget</code> struct yet, now is your moment!</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">struct </span><span style="color:#323232;">ColorPicker {
+</span><span style="color:#323232;">    </span><span style="color:#323232;">cursor_x: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">cursor_y: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">,
+</span><span style="color:#323232;">}
+</span></pre>
+<p>Let's initialize ColorPicker with some default values in <code>main()</code>:</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> window </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">WindowDesc::new(|| ColorPicker { cursor_x: </span><span style="color:#0086b3;">0.2</span><span style="color:#323232;">, cursor_y: </span><span style="color:#0086b3;">0.9 </span><span style="color:#323232;">});
+</span></pre>
+<p>Now let's draw a black rectangle at that (x, y) position. Inside our paint method, below the call to <code>draw_image()</code>:</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> cursor_rect </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">Rect::from_origin_size((</span><span style="color:#0086b3;">100.</span><span style="color:#323232;">, </span><span style="color:#0086b3;">100.</span><span style="color:#323232;">), (</span><span style="color:#0086b3;">10.</span><span style="color:#323232;">, </span><span style="color:#0086b3;">10.</span><span style="color:#323232;">));
+</span><span style="color:#323232;">paint_ctx.</span><span style="color:#62a35c;">stroke</span><span style="color:#323232;">(cursor_rect, </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">Color::</span><span style="color:#0086b3;">BLACK</span><span style="color:#323232;">, </span><span style="color:#0086b3;">1.0</span><span style="color:#323232;">);
+</span></pre>
+<p>That paints a black-stroked rectangle at the point (100., 100.), with the size of (10., 10.). I know that doesn't use our <code>cursor_x</code> / <code>y</code>, but I just wanted to show you the basic pixel positioning version real quick before we get fancy and use a <code>UnitPoint</code> for positioning.</p>
+<p><img src="../static/images/dw_3.png" alt="we drew a rectangle" /></p>
+<p>Okay, fancy time:</p>
+<pre style="background-color: #eff0f1;"><span style="font-style:italic;color:#969896;">// Create a UnitPoint from our cursor floats
+</span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> cursor_point </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">druid::piet::UnitPoint::new(self.cursor_x, self.cursor_y);
+</span><span style="font-style:italic;color:#969896;">// Create a rect that&#39;s the size of our whole widget
+</span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> resolve_rect </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">Rect::from_origin_size(Point::</span><span style="color:#0086b3;">ORIGIN</span><span style="color:#323232;">, base_state.</span><span style="color:#62a35c;">size</span><span style="color:#323232;">());
+</span><span style="font-style:italic;color:#969896;">// Calling resolve on the UnitPoint returns a Point relative to the rectangle it&#39;s passed
+</span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> resolved_point </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> cursor_point.</span><span style="color:#62a35c;">resolve</span><span style="color:#323232;">(resolve_rect);
+</span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> cursor_rect </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">Rect::from_origin_size(resolved_point, (</span><span style="color:#0086b3;">10.</span><span style="color:#323232;">, </span><span style="color:#0086b3;">10.</span><span style="color:#323232;">));
+</span><span style="color:#323232;">paint_ctx.</span><span style="color:#62a35c;">stroke</span><span style="color:#323232;">(cursor_rect, </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">Color::</span><span style="color:#0086b3;">BLACK</span><span style="color:#323232;">, </span><span style="color:#0086b3;">1.0</span><span style="color:#323232;">);
+</span></pre>
+<p>Beautiful.</p>
+<p>One last thing to draw: an inset white rectangle to make our cursor visible over dark zones.</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> inset_point </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> resolved_point </span><span style="font-weight:bold;color:#a71d5d;">+ </span><span style="color:#323232;">druid::kurbo::Vec2::new(</span><span style="color:#0086b3;">1.</span><span style="color:#323232;">, </span><span style="color:#0086b3;">1.</span><span style="color:#323232;">);
+</span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> white_cursor_rect </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">Rect::from_origin_size(inset_point, (</span><span style="color:#0086b3;">8.</span><span style="color:#323232;">, </span><span style="color:#0086b3;">8.</span><span style="color:#323232;">));
+</span><span style="color:#323232;">paint_ctx.</span><span style="color:#62a35c;">stroke</span><span style="color:#323232;">(white_cursor_rect, </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">Color::rgba8(</span><span style="color:#0086b3;">255</span><span style="color:#323232;">, </span><span style="color:#0086b3;">255</span><span style="color:#323232;">, </span><span style="color:#0086b3;">255</span><span style="color:#323232;">, </span><span style="color:#0086b3;">128</span><span style="color:#323232;">), </span><span style="color:#0086b3;">1.0</span><span style="color:#323232;">);
+</span></pre>
+<p>Note the tasteful use of transparency in the fourth or fifth method of color creation I've shown thus far.</p>
+<h2>5. Adding interactivity</h2>
+<p>Time to move on to the <code>fn event()</code> method! The <code>event()</code> method receives an <code>Event</code> called <code>event</code> that we can match on:</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">fn </span><span style="font-weight:bold;color:#795da3;">event</span><span style="color:#323232;">(</span><span style="font-weight:bold;color:#a71d5d;">&amp;mut </span><span style="color:#323232;">self, event: </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">Event, _ctx: </span><span style="font-weight:bold;color:#a71d5d;">&amp;mut</span><span style="color:#323232;"> EventCtx, _data: </span><span style="font-weight:bold;color:#a71d5d;">&amp;mut</span><span style="color:#323232;"> String, _env: </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">Env) {
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">match</span><span style="color:#323232;"> event {
+</span><span style="color:#323232;">        </span><span style="color:#323232;">Event::MouseDown(mouse) </span><span style="font-weight:bold;color:#a71d5d;">=&gt; </span><span style="color:#323232;">{
+</span><span style="color:#323232;">            </span><span style="color:#323232;">dbg!(mouse);
+</span><span style="color:#323232;">        </span><span style="color:#323232;">},
+</span><span style="color:#323232;">        </span><span style="font-weight:bold;color:#a71d5d;">_ =&gt; </span><span style="color:#323232;">(),
+</span><span style="color:#323232;">    </span><span style="color:#323232;">}
+</span><span style="color:#323232;">}
+</span></pre>
+<p>If you run the app and click anywhere inside the window, you should get some helpful info about the <code>MouseEvent</code> printed to the terminal.</p>
+<p>Here's what mine said:</p>
+<pre style="white-space: pre-wrap;">[examples/color_picker.rs:133] mouse = MouseEvent {
+    pos: (260.84375, 203.609375),
+    mods: Mods(None),
+    count: 1,
+    button: Left,
+}
+</pre>
+<p>So what we want to do is take that position, <code>UnitPoint</code>-ify it, and set <code>self.cursor_x</code> / <code>self.cursor_y</code> to that.</p>
+<p>But here's the thing: we need to know how big the widget is to calculate a 0.0 -&gt; 1.0 value, and we can't access that size information from inside the event handler. So: more state!</p>
+<p>Add a size field to our struct.</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">struct </span><span style="color:#323232;">ColorPicker {
+</span><span style="color:#323232;">    </span><span style="color:#323232;">cursor_x: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">cursor_y: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">size: Size,
+</span><span style="color:#323232;">}
+</span></pre>
+<p>And initialize it as <code>Size::default()</code>.</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> window </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">WindowDesc::new(|| ColorPicker {
+</span><span style="color:#323232;">    </span><span style="color:#323232;">cursor_x: </span><span style="color:#0086b3;">0.2</span><span style="color:#323232;">,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">cursor_y: </span><span style="color:#0086b3;">0.9</span><span style="color:#323232;">,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">size: Size::default()
+</span><span style="color:#323232;">});
+</span></pre>
+<p>Inside the widget's <code>layout</code> method we'll set the size to equal the max <code>BoxConstraints</code> our widget is passed and then return that.</p>
+<pre style="background-color: #eff0f1;"><span style="color:#323232;">self.size </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> bc.</span><span style="color:#62a35c;">max</span><span style="color:#323232;">();
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">self.size
+</span></pre>
+<p>And now, finally, we can do our calculation inside the <code>event</code> method:</p>
+<pre style="background-color: #eff0f1;"><span style="color:#323232;">Event::MouseDown(mouse) </span><span style="font-weight:bold;color:#a71d5d;">=&gt; </span><span style="color:#323232;">{
+</span><span style="color:#323232;">    </span><span style="color:#323232;">self.cursor_x </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> mouse.pos.x </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#323232;">self.size.width;
+</span><span style="color:#323232;">    </span><span style="color:#323232;">self.cursor_y </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> mouse.pos.y </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#323232;">self.size.height;
+</span><span style="color:#323232;">    </span><span style="color:#323232;">dbg!(self.cursor_x, self.cursor_y);
+</span><span style="color:#323232;">},
+</span></pre>
+<p>Run that and... Oh no! The cursor isn't moving! This was my clever plan to get you to notice one very important part of widget-building:</p>
+<pre style="background-color: #eff0f1;"><span style="color:#323232;">ctx.</span><span style="color:#62a35c;">invalidate</span><span style="color:#323232;">();
+</span></pre>
+<p>Invalidate marks this widget as &quot;dirty,&quot; so now Druid knows to redraw it on its next pass. Add this line below those cursor calculations in <code>event</code> and you should have your first interactive Druid widget up and running! Congrats.</p>
+<h2>6. Better event handling</h2>
+<p><img src="../static/images/dw_anim_small.gif" alt="interactive example" /></p>
+<p>If you click around you'll notice the cursor doesn't move exactly how you'd expect, especially when you click and drag. That's because you've used a color picker before, and you have expectations. This is the &quot;game&quot; of making widgets: if it looks like a widget people have used before, it needs to behave in a way that those prior experiences have conditioned them for.</p>
+<p>To be specific: in our case, we need to handle <code>Event::MouseMoved</code> inside our <code>event</code> match statement.</p>
+<pre style="background-color: #eff0f1;"><span style="color:#323232;">Event::MouseMoved(mouse) </span><span style="font-weight:bold;color:#a71d5d;">=&gt; </span><span style="color:#323232;">{
+</span><span style="color:#323232;">    </span><span style="color:#323232;">self.cursor_x </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> mouse.pos.x </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#323232;">self.size.width;
+</span><span style="color:#323232;">    </span><span style="color:#323232;">self.cursor_y </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> mouse.pos.y </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#323232;">self.size.height;
+</span><span style="color:#323232;">    </span><span style="color:#323232;">ctx.</span><span style="color:#62a35c;">invalidate</span><span style="color:#323232;">();
+</span><span style="color:#323232;">},
+</span></pre>
+<p>If you run that, you'll notice it works a little too well: now the cursor follows your mouse around no matter what.</p>
+<p>In the <code>MouseDown</code> event we need to set the widget as &quot;active,&quot; and then when we move the cursor we can check if we're active. And so, of course, we'll also need a <code>MouseUp</code> event to turn off active.</p>
+<pre style="background-color: #eff0f1;"><span style="color:#323232;">Event::MouseDown(mouse) </span><span style="font-weight:bold;color:#a71d5d;">=&gt; </span><span style="color:#323232;">{
+</span><span style="color:#323232;">    </span><span style="color:#323232;">ctx.</span><span style="color:#62a35c;">set_active</span><span style="color:#323232;">(</span><span style="color:#0086b3;">true</span><span style="color:#323232;">);
+</span><span style="color:#323232;">    </span><span style="color:#323232;">self.cursor_x </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> mouse.pos.x </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#323232;">self.size.width;
+</span><span style="color:#323232;">    </span><span style="color:#323232;">self.cursor_y </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> mouse.pos.y </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#323232;">self.size.height;
+</span><span style="color:#323232;">    </span><span style="color:#323232;">ctx.</span><span style="color:#62a35c;">invalidate</span><span style="color:#323232;">();
+</span><span style="color:#323232;">},
+</span><span style="color:#323232;">Event::MouseMoved(mouse) </span><span style="font-weight:bold;color:#a71d5d;">=&gt; </span><span style="color:#323232;">{
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">if</span><span style="color:#323232;"> ctx.</span><span style="color:#62a35c;">is_active</span><span style="color:#323232;">() {
+</span><span style="color:#323232;">        </span><span style="color:#323232;">self.cursor_x </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> mouse.pos.x </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#323232;">self.size.width;
+</span><span style="color:#323232;">        </span><span style="color:#323232;">self.cursor_y </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> mouse.pos.y </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#323232;">self.size.height;
+</span><span style="color:#323232;">        </span><span style="color:#323232;">ctx.</span><span style="color:#62a35c;">invalidate</span><span style="color:#323232;">();
+</span><span style="color:#323232;">    </span><span style="color:#323232;">}
+</span><span style="color:#323232;">},
+</span><span style="color:#323232;">Event::MouseUp(</span><span style="font-weight:bold;color:#a71d5d;">_</span><span style="color:#323232;">) </span><span style="font-weight:bold;color:#a71d5d;">=&gt; </span><span style="color:#323232;">{
+</span><span style="color:#323232;">    </span><span style="color:#323232;">ctx.</span><span style="color:#62a35c;">set_active</span><span style="color:#323232;">(</span><span style="color:#0086b3;">false</span><span style="color:#323232;">);
+</span><span style="color:#323232;">},
+</span><span style="font-weight:bold;color:#a71d5d;">_ =&gt; </span><span style="color:#323232;">(),
+</span></pre>
+<p>You'll notice we're working with the mutable <code>EventCtx</code> object, which is a bit of a grab bag of functionality. I won't go into it all here, I'm just giving you a heads up in case you're wondering how to do X and you find out later that X is a method on <code>EventCtx</code>.</p>
+<h2>7. Dealing with Data</h2>
+<p>Right now our app functional but... incomplete. One limitation is the fact that we have no idea what color value we've selected unless we print it to the terminal. Let's fix that.</p>
+<p>You might have noticed that we're still passing a <code>String</code> to our root widget at app launch. Let's change that to a custom <code>ColorState</code> struct, and make a new <code>HSL</code> color type for it to hold.</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">use </span><span style="color:#323232;">druid::{Data, </span><span style="font-weight:bold;color:#a71d5d;">...</span><span style="color:#323232;">};
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">#[derive(Clone, Data)]
+</span><span style="font-weight:bold;color:#a71d5d;">struct </span><span style="color:#323232;">HSL {
+</span><span style="color:#323232;">    </span><span style="color:#323232;">hue: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">saturation: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">lightness: </span><span style="font-weight:bold;color:#a71d5d;">f64
+</span><span style="color:#323232;">}
+</span></pre>
+<p>The <code>Data</code> trait has to be implemented for any data that flows through our app; Druid uses it to determine when changes have occured that our widget needs to know about. <code>Data</code> can be derived in most cases; what’s important is that types that implement <code>Data</code> should be fairly cheap to clone and compare. Importantly, <code>Data</code> is implemented automatically for primitive types, as well as for <code>Arc&lt;T&gt;</code> and <code>Rc&lt;T&gt;</code>; if you're using a more complicated type, you can always wrap it in one of those smart pointers.</p>
+<p>Right now our <code>ColorPicker</code> widget only accepts data of type <code>String</code>. Change it to <code>HSL</code>.</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">impl </span><span style="color:#323232;">Widget&lt;HSL&gt; </span><span style="font-weight:bold;color:#a71d5d;">for </span><span style="color:#323232;">ColorPicker {
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">...
+</span><span style="color:#323232;">}
+</span></pre>
+<p>Then, in the AppLauncher, change the initial state to an <code>HSL</code> object with your favorite initial values.</p>
+<pre style="background-color: #eff0f1;"><span style="color:#323232;">.</span><span style="color:#62a35c;">launch</span><span style="color:#323232;">(</span><span style="color:#0086b3;">HSL </span><span style="color:#323232;">{ hue: </span><span style="color:#0086b3;">0.4</span><span style="color:#323232;">, saturation: </span><span style="color:#0086b3;">0.4</span><span style="color:#323232;">, lightness: </span><span style="color:#0086b3;">0.4 </span><span style="color:#323232;">})
+</span></pre>
+<p>We also need to change the type of the data field in each of our widget methods from <code>&amp;String</code> / <code>&amp;mut String</code> to <code>&amp;HSL</code> / <code>&amp;mut HSL</code>.</p>
+<p>And now that <em>that's</em> all wired up, we can go around and change all of our <code>self.cursor_x</code> and <code>self.cursor_y</code> out for <code>data.saturation</code> and <code>data.lightness</code> respectively and delete <code>cursor_x</code> / <code>cursor_y</code> from the ColorPicker struct. In a sense, we've &quot;lifted&quot; the source of truth for our widget's important state up to the app level, while keeping the unimportant implementation details (just the size, in this case) internal.</p>
+<p>Now if you change the hardcoded hue value being passed to <code>make_sl_image()</code> to <code>data.hue</code>, you should see whatever initial hue state you've provided your app.</p>
+<h2>8. Sliders (and Lenses!)</h2>
+<p>So right now we can set the hue at compile time. But a real color picker would let you adjust it on the fly. What we need is a slider.</p>
+<p>I just so happen to be the proud father of a widget called Slider. While our ColorPicker is currently designed to work with data of type <code>HSL</code>, Slider operates on plain old <code>f64</code>. So if we put a Slider in our widget tree, what will happen? We'll get an error something like this:</p>
+<pre style="white-space: pre-wrap;">the trait `druid::Widget&lt;HSL&gt;` is not implemented for `impl druid::Widget&lt;f64&gt;`
+</pre>
+<p>But ColorPicker is just three f64s under the hood. How do we get at those?</p>
+<p>Enter Lenses. A lens is a datatype that gives access to a part of a larger data structure. In our case, we can derive Lens just like how we derived Data:</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">use </span><span style="color:#323232;">druid::{Lens, </span><span style="font-weight:bold;color:#a71d5d;">...</span><span style="color:#323232;">};
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">#[derive(Clone, Data, Lens)]
+</span><span style="font-weight:bold;color:#a71d5d;">struct </span><span style="color:#323232;">HSL {
+</span><span style="color:#323232;">    </span><span style="color:#323232;">hue: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">saturation: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">lightness: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">,
+</span><span style="color:#323232;">}
+</span></pre>
+<p>This macro creates a module called <code>lenses</code>, with a submodule of <code>hsl</code>, with subsubmodules of <code>hue</code>, <code>saturation</code>, and <code>lightness</code>. We can use these lenses to adapt our <code>HSL</code> data structure to any widget that expects an f64:</p>
+<pre style="background-color: #eff0f1;"><span style="color:#323232;">LensWrap::new(WidgetThatExpectsf64::new(), lenses::hsl::hue);
+</span></pre>
+<p>Sorry for the excess of magic, Druid is a work in progress and we're still figuring out the design for some of this stuff. The most important takeaway for now is that Lenses let us &quot;focus&quot; on a single field in a larger data structure.</p>
+<pre style="white-space: pre-wrap;">                   +-------+
+                   |       |
+Struct with        |       |       That one
+a bunch of  +----&gt; | Lens  | +---&gt; field we
+fields             |       |       care about
+                   |       |
+                   +-------+
+</pre>
+<p>You could think of them like a mask in Photoshop:
+<img src="../static/images/dw_lens.png" alt="lens mask" /></p>
+<p>Or, if it helps, just think of it as a getter / setter.</p>
+<p>Okay, so we're about to expand our widget tree a bit. Let's spin it out into its own function. For starters, let's just do a lens-wrapped Slider on its own and then we'll add the ColorPicker back in.</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">use </span><span style="color:#323232;">druid::{LensWrap, </span><span style="font-weight:bold;color:#a71d5d;">...</span><span style="color:#323232;">};
+</span><span style="font-weight:bold;color:#a71d5d;">use </span><span style="color:#323232;">druid::widget::{Slider};
+</span><span style="color:#323232;">
+</span><span style="font-weight:bold;color:#a71d5d;">fn </span><span style="font-weight:bold;color:#795da3;">ui_builder</span><span style="color:#323232;">() -&gt; impl Widget&lt;HSL&gt; {
+</span><span style="color:#323232;">    </span><span style="color:#323232;">
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> slider </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">LensWrap::new(Slider::new(), lenses::hsl::hue);
+</span><span style="color:#323232;">    </span><span style="color:#323232;">
+</span><span style="color:#323232;">    </span><span style="color:#323232;">slider
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">}
+</span><span style="color:#323232;">
+</span><span style="font-weight:bold;color:#a71d5d;">fn </span><span style="font-weight:bold;color:#795da3;">main</span><span style="color:#323232;">() {
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> window </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">WindowDesc::new(ui_builder);
+</span><span style="color:#323232;">    </span><span style="color:#323232;">
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">...
+</span><span style="color:#323232;">    </span><span style="color:#323232;">
+</span><span style="color:#323232;">}
+</span></pre>
+<p>So now <code>ui_builder()</code> will construct our widget tree for us. We pass the Slider widget and the hue lens to LensWrap, which acts as a higher order widget. The Slider gets (mutable!) access to the HSL’s hue field.</p>
+<p>If you run that, you should get an app that's just a Slider. Let's add a few labels so we can see what the slider is doing.</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">use </span><span style="color:#323232;">druid::widget::{Column, DynLabel, </span><span style="font-weight:bold;color:#a71d5d;">...</span><span style="color:#323232;">};
+</span><span style="color:#323232;">
+</span><span style="font-weight:bold;color:#a71d5d;">let mut</span><span style="color:#323232;"> col </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">Column::new();
+</span><span style="color:#323232;">
+</span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> slider </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">LensWrap::new(Slider::new(), lenses::hsl::hue);
+</span><span style="color:#323232;">
+</span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> hue_label </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">DynLabel::new(|data: </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">HSL, _env| {
+</span><span style="color:#323232;">    </span><span style="color:#323232;">format!(</span><span style="color:#183691;">&quot;Hue: </span><span style="color:#0086b3;">{0:.2}</span><span style="color:#183691;">&quot;</span><span style="color:#323232;">, data.hue)
+</span><span style="color:#323232;">});
+</span><span style="color:#323232;">
+</span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> sat_label </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">DynLabel::new(|data: </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">HSL, _env| {
+</span><span style="color:#323232;">    </span><span style="color:#323232;">format!(</span><span style="color:#183691;">&quot;Saturation: </span><span style="color:#0086b3;">{0:.2}</span><span style="color:#183691;">&quot;</span><span style="color:#323232;">, data.saturation)
+</span><span style="color:#323232;">});
+</span><span style="color:#323232;">
+</span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> light_label </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">DynLabel::new(|data: </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">HSL, _env| {
+</span><span style="color:#323232;">    </span><span style="color:#323232;">format!(</span><span style="color:#183691;">&quot;Lightness: </span><span style="color:#0086b3;">{0:.2}</span><span style="color:#183691;">&quot;</span><span style="color:#323232;">, data.lightness)
+</span><span style="color:#323232;">});
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">col.</span><span style="color:#62a35c;">add_child</span><span style="color:#323232;">(slider, </span><span style="color:#0086b3;">1.0</span><span style="color:#323232;">);
+</span><span style="color:#323232;">col.</span><span style="color:#62a35c;">add_child</span><span style="color:#323232;">(hue_label, </span><span style="color:#0086b3;">1.0</span><span style="color:#323232;">);
+</span><span style="color:#323232;">col.</span><span style="color:#62a35c;">add_child</span><span style="color:#323232;">(sat_label, </span><span style="color:#0086b3;">1.0</span><span style="color:#323232;">);
+</span><span style="color:#323232;">col.</span><span style="color:#62a35c;">add_child</span><span style="color:#323232;">(light_label, </span><span style="color:#0086b3;">1.0</span><span style="color:#323232;">);
+</span><span style="color:#323232;">col
+</span></pre>
+<p>Each of these DynLabel widgets accepts a closure which converts the data into a String (so no need for a Lens). We add them each, along with the slider, to a column widget to keep everything nice and organized.</p>
+<p>Now let's add back in the ColorPicker widget.</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> color_picker </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> ColorPicker {
+</span><span style="color:#323232;">    </span><span style="color:#323232;">size: Size::default()
+</span><span style="color:#323232;">};
+</span><span style="color:#323232;">col.</span><span style="color:#62a35c;">add_child</span><span style="color:#323232;">(color_picker, </span><span style="color:#0086b3;">1.0</span><span style="color:#323232;">);
+</span></pre>
+<p>If everything has gone correctly, the hue slider should control the hue of our ColorPicker now. Not too bad, yes?</p>
+<h2>Eight Point Five</h2>
+<p>One quick fix to keep our cursor (mostly) inside its zone:</p>
+<pre style="background-color: #eff0f1;"><span style="color:#323232;">data.saturation </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">(mouse.pos.x </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#323232;">self.size.width).</span><span style="color:#62a35c;">max</span><span style="color:#323232;">(</span><span style="color:#0086b3;">0.0</span><span style="color:#323232;">).</span><span style="color:#62a35c;">min</span><span style="color:#323232;">(</span><span style="color:#0086b3;">1.0</span><span style="color:#323232;">);
+</span><span style="color:#323232;">data.lightness </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">(mouse.pos.y </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#323232;">self.size.height).</span><span style="color:#62a35c;">max</span><span style="color:#323232;">(</span><span style="color:#0086b3;">0.0</span><span style="color:#323232;">).</span><span style="color:#62a35c;">min</span><span style="color:#323232;">(</span><span style="color:#0086b3;">1.0</span><span style="color:#323232;">);
+</span></pre>
+<h2>9. Layout</h2>
+<p>Right now our rectangle of color squishes and squashes when we resize the window. That might be appropriate for some widgets, but in my experience, most color pickers have a fixed size and aspect ratio.</p>
+<p>Also, just so you're aware, Piet's <code>draw_image()</code> method automatically scales and adjusts the aspect ratio of an image to match the rectangle it's passed. That's why our &quot;256 x 256&quot; image is never actually &quot;256 x 256&quot;</p>
+<p>Let's revisit the <code>layout</code> method and fix this.</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> default_size </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">Size::new(</span><span style="color:#0086b3;">256.</span><span style="color:#323232;">, </span><span style="color:#0086b3;">256.</span><span style="color:#323232;">);
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">self.size </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> bc.</span><span style="color:#62a35c;">constrain</span><span style="color:#323232;">(default_size);
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">self.size
+</span></pre>
+<p>What <code>bc.constrain</code> is saying is: I want to be this particular size, clamped between the maximum size I'm <em>allowed</em> to fill and the minimum size I'm <em>required</em> to fill.</p>
+<p>So if we run this... nothing has changed. That's because, in fact, the constraints we're being passed have an identical minimum and max. Therefore <code>constrain</code> ends up ignoring our <code>default_size</code> entirely.</p>
+<p>To fix this we need one more widget to wrap <code>color_picker</code> when we add it to <code>col</code>.</p>
+<pre style="background-color: #eff0f1;"><span style="color:#323232;">druid::widget::{Align, </span><span style="font-weight:bold;color:#a71d5d;">...</span><span style="color:#323232;">};
+</span><span style="font-style:italic;color:#969896;">// col.add_child(color_picker, 1.0);
+</span><span style="color:#323232;">col.</span><span style="color:#62a35c;">add_child</span><span style="color:#323232;">(Align::centered(color_picker), </span><span style="color:#0086b3;">1.0</span><span style="color:#323232;">);
+</span></pre>
+<p>What Align does (in addition to aligning its child) is to pass along a minimum constraint of zero size while keeping the max constraint the same.</p>
+<p>Finally, let's zero out the flex amount of the slider and labels:</p>
+<pre style="background-color: #eff0f1;"><span style="color:#323232;">col.</span><span style="color:#62a35c;">add_child</span><span style="color:#323232;">(slider, </span><span style="color:#0086b3;">0.0</span><span style="color:#323232;">);
+</span><span style="color:#323232;">col.</span><span style="color:#62a35c;">add_child</span><span style="color:#323232;">(hue_label, </span><span style="color:#0086b3;">0.0</span><span style="color:#323232;">);
+</span><span style="color:#323232;">col.</span><span style="color:#62a35c;">add_child</span><span style="color:#323232;">(sat_label, </span><span style="color:#0086b3;">0.0</span><span style="color:#323232;">);
+</span><span style="color:#323232;">col.</span><span style="color:#62a35c;">add_child</span><span style="color:#323232;">(light_label, </span><span style="color:#0086b3;">0.0</span><span style="color:#323232;">);
+</span></pre>
+<p><img src="../static/images/dw_4.png" alt="final app" /></p>
+<p>Now if we run this, we can still squish the ColorPicker if we make the window really small, but we can't stretch it beyond 256 x 256.</p>
+<h2>10. A time for self-congratulation</h2>
+<p>Good job if you got this far, and thanks for reading!</p>
+<p>Obviously there are a lot of improvements left to make. For instance, the cursor hangs off the edge on the bottom and right sides, and isn't really centered on the mouse anyway. But I think it should be pretty straightforward to solve that problem using the techniques we've already covered and some peeking at other widget code.</p>
+<p>It might be fun to make a color picker that's generic over other color spaces, but I don't really know the best way to do that myself so maybe you could do that and tell me about it.</p>
+<p>If you do run into issues in general that sound more my speed, please hit me up in my <a href="https://twitter.com/futurepaul">twitter dms</a> or join the #druid channel in our <a href="https://xi.zulipchat.com/">Zulip chat</a>.</p>
+<p><em>Update: An earlier version of this tutorial incorrectly used &quot;luminosity&quot; to refer to &quot;lightness.&quot; This has been corrected. Thank you, /u/burgundy_tide!</em></p>
+]]>
+      </description>
+    </item>
+    <item>
+      <title>
+        Why Bitcoin
+      </title>
+      <link>https://pauljmiller.com/posts/why-bitcoin.html</link>
+      <pubDate>Sat, 21 Sep 2019 00:45:59 +0000</pubDate>
+      <guid>https://pauljmiller.com/posts/why-bitcoin.html</guid>
+      <description>
+        <![CDATA[<p>Over the past year I'm sure you've noticed me steering nearly every conversation into Bitcoin. I'll say something like, &quot;And that's what's so great about Bitcoin...&quot; or &quot;Bitcoin fixes this because...&quot; or a simple &quot;Buy Bitcoin!&quot;</p>
+<p>I appreciate your forbearance as I've devolved into a crazed cult member of an improbable, invisible, digital currency.</p>
+<p>But what if I'm not, in fact, crazy? I'd like you to give me a few minutes of your time while I explain the rationale behind my obsession. I don't mind you dunking on me with &quot;silly Paul and his Bitcoin!&quot; goofs, I understand that Bitcoin on its surface sounds weird and pointless. But there is an actual depth of thought and a serious motivation behind Bitcoin, and I'd love it if you hear me out just this once, as a kindness to me if for no other reason.</p>
+<h1>What's money?</h1>
+<p>Seriously, what is it? How would you define it? Why is it important? Why don't we just have a barter economy? Why is some money better than other money? Which money is best?</p>
+<p>I'd encourage you to think through these questions at your own pace and make sure you have a satisfactory answer. It's questions like these, many of which I first encountered in <a href="https://saifedean.com/the-book/">Saifedean Ammous' <em>The Bitcoin Standard</em></a>, which led me to my current stance on the topic: Bitcoin is the best money.</p>
+<p>Here's one way to think of money: money is a technology for transferring value through time and space.</p>
+<p>When we do useful work we create value. Often someone is willing to pay us for our work. It might be a like-for-like exchange: &quot;I'll do the dishes if you mow the lawn.&quot; It might be some form of barter: &quot;I'll give you a PlayStation if you paint the fence.&quot; But usually our primary income is in the form of money: &quot;I'll give you $75,000 if you show up at this office and edit spreadsheets for a year.&quot;</p>
+<p>When someone pays us for our work, we're making a trade: I value this payment more than I value my time. And the reason our day job usually pays us in money, not PlayStations or backrub IOUs or Chuck E. Cheese tokens, is because money is &quot;the most saleable good.&quot; That is to say, there are more buyers of money than there are buyers of PlayStations or backrub IOUs, therefore it's usually the most convenient thing to store value in, all things being equal.</p>
+<p>Money is an intermediate. It's for transferring value through time until you know what to do with it. If you don't know what to get someone for their birthday, you give them cash, so they can buy something they actually want. And your employer paid you that cash in the first place for similar reasons.</p>
+<p>So, what does this have to do with Bitcoin. Well, here's a question about your current money: <a href="https://www.federalreserve.gov/faqs/money_12845.htm">how many dollars are there in the world</a>? How many dollars will be in the world tomorrow? Or a year from now? Fifty years from now?</p>
+<p>If the purpose of money is to move value through time, wouldn't it be nice to know what &quot;one dollar&quot; is actually a share of? You know the number on the top of the fraction, but what's the denominator? And, more importantly, what will the denominator be when you finally need to spend it? In the extreme case: are you holding on to dollars that you will one day be shoveling into a wheelbarrow?</p>
+<p>For Bitcoin, <a href="https://www.buybitcoinworldwide.com/how-many-bitcoins-are-there/">figuring out the denominator is easy</a>. At the time of this writing there are 17,947,425 Bitcoins. Each day there are 1,800 new Bitcoins added. Every four years the issuance rate is cut in half. In the long run there will be 21,000,000 Bitcoins, and never any more.</p>
+<p>So, all things being equal, how would you prefer to store your wealth: as a fixed fraction of a fixed supply, or as a dwindling fraction of an ever-increasing and difficult to audit supply?</p>
+<p>What's worth more: a rare Beanie Baby or a non-rare Beanie Baby? You don't even need to look it up on eBay, the answer is intuitive. Humans value scarcity.</p>
+<p>See, government-run currencies (and Beanie Babies) serve a dual purpose. You use them to store value. Governments and banks (and Ty Inc.) use them to raise revenue through debasement and seigniorage. These purposes are at odds! For a centrally controlled asset, the temptation to inflate is too strong to be resisted!</p>
+<p>Because we've grown up in a country with a frog-boilingly-steady rate of inflation (with the occasional terrifying blip of serious inflation), we're knowledgeable in ways to mitigate the pain of having our hard-won wealth siphoned away. Buy stocks. Buy houses. If you're really rich, buy art. These items gain what's called a &quot;monetary premium,&quot; as in they cost more than they might otherwise, due to their dual use: part practical asset (stocks are supposed to give dividends, houses are for living in) and part money (saleable, value-holding).</p>
+<p>But houses are harder to sell than money (less liquid). The stock market is dominated by professional investors who know more than you do, and big players who get new money for cheaper than you do (unlevel playing field). Putting a $10 million painting in a vault seems like it's missing the point somehow, and paying $10 million for a painting you hate, just because it might store value, seems even sadder.</p>
+<p>Investing is a use for money, but it's different than money. Ideally money would hold its value through time while you wait for an opportunity to use it well, rather than slipping through your fingers as you hold it, forcing you into sub-optimal investments.</p>
+<p>Once you start to realize how arbitrary, inflationary, and weaponized the US dollar is, a lot of the puzzling parts of the economy start to make sense: Why are all these people making millions on Wall Street for the seemingly non-productive task of making weird abstractions out of money, debt, and risk? Why do we have booms and busts? Why don't retail banks pay me interest on my savings anymore? Why is Trump tweeting about negative interest rates? Why is Modern Monetary Theory so hot right now? Why do TVs get better, bigger, and cheaper every year, while education and health care skyrocket in cost?</p>
+<p>A better money fixes this. Bitcoin fixes this.</p>
+<h1>But will it work?</h1>
+<p>And so perhaps let's say you could be convinced that a better form of money is conceivable. But practical? That's pie-in-the-sky thinking, yes?</p>
+<p>Well, I want you to take yourself back in time three years. Imagine if you had been convinced then that Bitcoin is money and you said, &quot;alright, I'll give it a shot.&quot; <a href="https://dcabtc.com">Each week you bought $100 of Bitcoin, no matter what the price was, and you never sold</a>. After investing $15,700 in three years, that Bitcoin would now be worth $51,477 if you wanted to exit back into dollars. How many stocks do you know of <a href="https://www.buyupside.com/calculators/dollarcostave.php">that could outperform those returns</a>?</p>
+<p>Past performance is no indication of future success. Bitcoin has been making investors fabulously wealthy for ten years running, but it could be just one giant bubble, or a truly excellent ponzi scheme.</p>
+<p>Or it could be what I think it is: a better money. A money that stores value, with no long milkshake straw available to banks and government to siphon that value away. And a better money in all other regards as well. The people that believe that are buying Bitcoin. Not just as an investment, but as a transition to a new system. The true &quot;hodlers&quot; aren't planning on coming back.</p>
+<p>I understand this is a wild and improbable claim. It requires some serious evidence to back it up.</p>
+<p>And this, I would argue, is why Bitcoin is such a rabbit hole for someone like me. My first reaction is: it would be cool if it could work, but it won't. Then, a few years later: woah, that Bitcoin thing is still around? Why? How?</p>
+<p><em>Why? How?</em> are very deep questions.</p>
+<p>Most people don't know why or how their fiat currency works. It just works until it doesn't. Many people are confused and disheartened to learn about fractional reserve banking. Or the fact that the US dollar isn't backed by gold in Fort Knox. You've probably heard the term &quot;quantitative easing,&quot; but have you looked up what it means? Who do you think gets rich off of that sort of scam?</p>
+<p>In contrast, everything I learn about Bitcoin's fundamentals is <em>heartening</em>. And it makes me want to learn more.</p>
+<h1>What Bitcoin is</h1>
+<p>Bitcoin is a digital currency. Its fundamental technical breakthrough is solving &quot;digital scarcity&quot; through an algorithm called &quot;proof of work.&quot;</p>
+<p>Basically, Bitcoin is one big shared ledger. It's easy to add new transactions, but it's nearly impossible to edit old ones.</p>
+<p>Nodes on the Bitcoin network accept valid transactions and reject invalid ones. Valid transactions are put into a &quot;block&quot; which is &quot;hashed&quot; by miners. When a miner finds a hash under a certain number (akin to rolling a huge set of dice a few trillion times until they come up all ones) then that block of transactions is added to the &quot;blockchain&quot; and is propagated to the whole network. The miner is rewarded for his effort with a &quot;block reward&quot; (some quantity of new Bitcoin issuance) and any transaction fees (which are the miner's incentive for including any specific transaction in the block).</p>
+<p>The &quot;difficulty&quot; (how improbable of a number the miner needs to find) is dynamically adjusted to make sure a new block is found, on average, every ten minutes.</p>
+<p>Every four years the size of the miner's block reward gets cut in half. Right now it's 12.5 BTC. <a href="https://www.bitcoinclock.com/">In May of next year</a> we're having another &quot;halving,&quot; and miners will only receive 6.25 BTC per block they discover. Despite this unstoppable downward trend for the block reward (in BTC terms), the &quot;hashrate&quot; (the amount of computing power being actively applied to mining Bitcoin) <a href="https://bitinfocharts.com/comparison/bitcoin-hashrate.html">is climbing rapidly</a>.</p>
+<p>Since this network is completely decentralized and permissionless, the &quot;true state&quot; of the Bitcoin network — who has how much Bitcoin — is whichever blockchain is the &quot;tallest,&quot; which means whichever chain has the most blocks in it, and hence whichever chain took the most &quot;work&quot; to create.</p>
+<p>To attack the Bitcoin network with fraudulent transactions you would need, at a minimum, to have more than half the &quot;hashing power&quot; of the Bitcoin network under your control. This is very different than typical cyber security. Each individual member of the Bitcoin network can be hacked (which is just like typical cyber security), but because the Bitcoin network has no central point of failure, there is no known way to attack the network as a whole outside of brute force hash power — which, at the current levels of hashing, would require a significant amount of resources and effort on the part of a major nation state to pull off.</p>
+<h1>Thanks for the nerd rant, nerd!</h1>
+<p>Look, I know I just threw a ton of technical terms at you. And, I'll be totally honest right now: I don't know how the US dollar system really works in counterpoint. As far as I know, it's a few people in a room who decide interest rates and occasional quantitative easing, and then banks hand out the dollars through fractional reserve lending and... yeah, I really don't get it.</p>
+<p>But I <em>get</em> Bitcoin. I dare you to ask me about it. It's a complicated system with several novel-sounding pieces. But the system is knowable, it's well defined, and it works.</p>
+<p>With Bitcoin, possession means owning the cryptographic key (a long password) to a Bitcoin address (a string of letters and numbers). If you have the password, you can send Bitcoin to another address. If you don't, you can't. That's all you really need to know to actually use Bitcoin. There's no bank to put a stop on your account whenever it feels like it. There's no government to inflate the currency or limit you with capital controls.</p>
+<p>And there are no backsies if you screw up.</p>
+<p>The tradeoff with Bitcoin is that it requires taking more responsibility for the custody of your money. There's no FDIC out here in this wild west.</p>
+<p>It also means taking responsibility for the monetary policy. The issuance rate, the 21 million longterm fixed supply, and the validity of every single transaction, are validated by network participants running &quot;full nodes.&quot; It's a self-selected Federal Reserve in a weird way. And the more people who join, the more ossified the fundamental rules of the network become.</p>
+<p>In some ways this is more straightforward than storing your money in a bank, with all their arcane rules, random fees, and arbitrary rights over your money. But I can't argue that it's <em>easier</em>.</p>
+<p>Plus, Bitcoin's 10 year track record is impressive for a project in the digital age, but isn't quite on the scale of something like the US dollar or gold.</p>
+<p>And so I can understand why someone who is doing well inside the current system would have very little impetus to diversify to Bitcoin.</p>
+<p>But if you're worried about the stability or practicality of the current system, I think Bitcoin is an excellent hedge. Or, for some of us, a beautiful exit strategy. And fully worth the hassle.</p>
+<h1>The ethics of hoarding</h1>
+<blockquote>
+<p>Jesus said to him, “If you would be perfect, go, sell what you possess and give to the poor, and you will have treasure in heaven; and come, follow me.”</p>
+<p><em>Matthew 19:21</em></p>
+</blockquote>
+<p>Let's imagine again, for a moment, that you agreed with me. The US dollar is bad money, or at least has some major flaws, and Bitcoin is a better money, at least in the long run.</p>
+<p>But why should I be this focused on money in the first place? As it says in 1st Timothy: &quot;The love of money is the root of all kinds of evil.&quot;</p>
+<p>Or, here's another classic from Jesus Himself:</p>
+<blockquote>
+<p>&quot;Why put me to the test, you hypocrites? Show me the coin for the tax.&quot; And they brought him a denarius. And Jesus said to them, &quot;Whose likeness and inscription is this?&quot; They said, &quot;Caesar’s.&quot; Then he said to them, &quot;Therefore render to Caesar the things that are Caesar's, and to God the things that are God’s.&quot;</p>
+<p><em>Matthew 22:18-21</em></p>
+</blockquote>
+<p>There's no portrait on Bitcoin, so who should we render it to anyway? Just like how the US Constitution made the &quot;we the people&quot; sovereign, not the leaders, the sovereigns in Bitcoin are the network participants, not Abraham Lincoln.</p>
+<p>Let's break down the basic uses for money and see what Bitcoin's ethical implications are.</p>
+<h2>1. Buying stuff we need</h2>
+<p>A better money would be better for buying stuff we need, because it would hold its value up through the exact moment spending is required. An inflationary, debt-based money, in contrast, encourages spending as quickly as possible.</p>
+<h2>2. Buying stuff we want</h2>
+<p>A deflationary currency like Bitcoin discourages consumerism, because your money is almost always worth more tomorrow than it is today. Ask any long term Bitcoiner how their purchasing habits have changed over time. It's a remarkable shift in mindset!</p>
+<h2>3. Investing</h2>
+<p>A hard money benefits investment (at least from a subjective point of view) because with a hard money, investment isn't a mandatory activity. This improves the signal to noise ratio. You can invest in innovation and truly important businesses and projects, but you don't need to play the stock market and invest in random megacorps just to stay afloat.</p>
+<h2>4. Giving</h2>
+<p>This is where it gets interesting!</p>
+<p>It's harder to give your Bitcoin away than it is to give away fiat. As in, you aren't going to want to do it. When you give away a Bitcoin you might think to yourself: &quot;That could be worth a fortune someday.&quot; When you give away fiat, you can maybe think: &quot;I'm not using it, and it will be worthless in a decade or two!&quot; Bitcoin creates the opposite sensation of &quot;It's burning a hole in my pocket.&quot; Bitcoin repairs pocket holes.</p>
+<p>What a good, &quot;hard,&quot; money like Bitcoin teaches you is that <a href="https://twitter.com/pierre_rochard/status/1062510947510697984">hoarding money <em>is</em> using it</a>.</p>
+<p>One way to think about hoarding is it's giving everyone else a chance to spend. You're creating scarcity by witholding your spending, which improves the purchasing power of anyone who needs to spend right this second.</p>
+<p>Imagine you're shopping for a house. And also Jeff Bezos is shopping for a house in the same neighborhood simultaneously. Will it be easier for you to afford a house, or harder? Jeff Bezos could help me with his money by investing in my business, but him spending in the same market that I'm spending actively hurts my purchasing power.</p>
+<p>Okay, back to Jesus. Did Jesus ask the rich young guy to sell everything he had and give the money to the poor because of rampant inflation? Or the available tax deduction? Or as an economic stimulus plan? I don't believe so. I believe he asked it of this man because he knew it would be the hardest thing for him to do and was trying to prove a point.</p>
+<p>Bitcoin, like any good money, is difficult to give away. I don't think that's an indictment on Bitcoin, I think that's an indictment on us.</p>
+<h1>What money actually is</h1>
+<p>Humans long for safety. We wouldn't need money if we knew, for a certainty, that our every need and desire, and the needs and desires of the people we care about, would be supplied in perpetuity. Wealth is a hedge against uncertainty, and money, being the most saleable good, is the most convenient form to hold wealth in.</p>
+<p>Which is why wealth is so dangerous: we can begin to believe that we have true control over our lives, or at least become obsessed with chasing that control.</p>
+<p>Bitcoin removes some of money's uncertainties. Mostly due to the fact that it's neither a traditional physical good like gold, or subject to the day-to-day arbitrary judgement calls of the Federal Reserve. Bitcoin doesn't rust or dissolve over time. It's easy to transport. It's harder to steal. It impossible to inflate. It's really just math, numbers, and energy at the end of the day, and there's something really beautiful about that.</p>
+<p>I think it's better at money things than any money we've ever had on this planet.</p>
+<p>But it's still just money.</p>
+<p>I think it's possible to love <em>a</em> money without necessarily loving money.</p>
+<p>Maybe I'm just mincing words.</p>
+<p>Anyways, this is getting long, and I promised it would only take a few minutes of your time.</p>
+<p><a href="https://nakamotoinstitute.org/">Buy Bitcoin</a>!</p>
+]]>
+      </description>
+    </item>
+    <item>
+      <title>
+        Three projects is one less than four
+      </title>
+      <link>https://pauljmiller.com/posts/three-projects-in-may-actually.html</link>
+      <pubDate>Wed, 26 Jun 2019 12:45:59 +0000</pubDate>
+      <guid>https://pauljmiller.com/posts/three-projects-in-may-actually.html</guid>
+      <description>
+        <![CDATA[<p>Last month <a href="https://pauljmiller.com/posts/four-projects-in-may.html">I created a plan for myself</a>: instead of just tinkering with various projects, I would bring four projects to a point of portfolio-worthiness. One project a week.</p>
+<p>The result? I did three of them! And, also, did other things as well. Here's what went right, and what went wrong.</p>
+<h3>Code on tape</h3>
+<p>The moral of this story is: write your own components if you can. I've always approached programming as &quot;the idiot in the room.&quot; That is, I assume everyone else's GitHub code is so much better than mine that I'd be a <em>fool</em> to try and write my own implementation.</p>
+<p>But, in this case, it turned out way more efficacious — and, more importantly, more educational — to write my own component for wrapping the <a href="https://github.com/Microsoft/monaco-editor">Monaco Editor</a>. And a hook to <a href="https://codesandbox.io/s/81zkxw8qnl">record audio</a>. I still got stuck a lot, and still copied a lot of code from GitHub. Also, that hook <a href="https://twitter.com/dan_abramov/status/1126264624326823942">ended up being fixed by React's own Dan Abramov</a>, which feels a bit like cheating, but...</p>
+<p>The moral is still the same! Writing, or at least attempting to write, my own components instead of instantly reaching for whatever's hot on npm lead me to much better understanding of what I was doing, and therefore more steady progress instead of eternal stuckness.</p>
+<p>Unfortunately, while I got Code on tape to a working state, I didn't get it to an easily shareable state. Maybe I'll do that someday! This knocks my number of &quot;finished&quot; projects down to three, but of course &quot;finished&quot; is a very subjective thing.</p>
+<p>Oh, one more sidenote: I did state management in Overmind because it seemed to offer similar advantages to Redux but with much less boilerplate. I think that proved to be true!</p>
+<p>(Github: <a href="https://github.com/futurepaul/code-on-tape/tree/overmind">Code on tape</a>)</p>
+<h3>Calculator 2</h3>
+<p>This was easily my favorite project to build. Like with Code on tape, I had built a version of it before in React, but decided to rewrite it in Svelte 3 this time. And, because Svelte was such a breeze to work with, I ended up with more time to achieve two nice-to-haves:</p>
+<ol>
+<li>
+<p>Using Rust to do math. My earlier versions of Calculator 2 had used some random Javascript library to evaluate the math expressions. But now I'm using <a href="https://crates.io/crates/rsc">RSC, a Rust crate</a>, for which I created a simple WASM wrapper. It works, it feels fast and &quot;solid,&quot; if that's worth anything. And, also: it works!</p>
+</li>
+<li>
+<p>Because of Svelte and WASM, I was already dabbling in Webpack, which led me to make the boldest move of all: I wrote my own Webpack loader to turn mathematical notation into SVG. Earlier versions of Calculator 2 had used the excellent MathJax at runtime to accomplish the same thing. But, thanks to my Webpack loader I'm able to run MathJax at compile-time, saving gobs of Javascript at load-time and making everything just feel better.</p>
+</li>
+</ol>
+<p>(Github: <a href="https://github.com/futurepaul/calculator-2">Calculator 2 on Github</a>)</p>
+<h3>Fragment Notes</h3>
+<p>Again I switched to Svelte 3 for the frontend, instead of the weird non-React view library I had been using. I also rearranged the project into three pieces: the pure Rust library (that does the full-text search, mostly a ripgrep wrapper), the native module library (that wraps the Rust library with <a href="https://neon-bindings.com/">Neon Bindings</a> to make it work on Node), and the Electron app. This worked very well.</p>
+<p>Except.</p>
+<p>There's something I just don't really understand about how Node compiles native modules. When I try to compile a &quot;release&quot; version of my app to run as a binary, it ends up gigabytes big and insanely slow. But when I run <code>npm run start</code> from my project folder it works fine! And I find the build process so difficult, obtuse, and random, that I have zero motivation right now to track down a solution.</p>
+<p>So Fragment Notes is now a working product that I use for my own notes-searching purposes. But I don't know how to package and share it, unfortunately.</p>
+<p>(Github: <a href="https://github.com/futurepaul/fragment">Fragment Notes</a>)</p>
+<h3>My Own Personal Blog</h3>
+<p>Instead of totally revamping the My Own Personal Blog project to be the static site generator for normies, I merely added the functionality necessary to <a href="https://pauljmiller.com/projects.html">add the projects page</a>. So, in a way, this is still undone. That said, I really love using my own static site generator, and am always glad I chose to roll my own instead of attempting sticking with Hugo.</p>
+<p>(Github: <a href="https://github.com/futurepaul/my-own-personal-blog/tree/genericify">My Own Personal Blog</a>)</p>
+<h3>svg-to-piet</h3>
+<p>Woah, what's this? This wasn't in the original plan!</p>
+<p>That's right, during this month of working seriously on my own projects I also got extremely involved in the Piet / Druid community. My biggest work in this regard was a collab with <a href="https://github.com/cbrewster">Connor Brewster</a> to build a <a href="https://github.com/futurepaul/piet/tree/master/piet-raqote">Piet backend with Raqote</a>. That is to say, Piet is a API for 2D graphics, Raqote does the grunt work of laying down pixels, and what we wrote was the adapter between them.</p>
+<p>While piet-raqote is mostly an educational project, what I'm really excited about is <a href="https://github.com/xi-editor/druid">Druid</a>, which is a GUI framework built on Piet. With Druid I can make real, native apps using Rust — for instance, once Druid has the necessary functionality, I will be re-writing Fragment in Druid. Sorry, Electron, but you know this day would come eventually!</p>
+<p>To help with some Druid development I was doing, I made svg-to-piet, which is a simple utility to convert an SVG into Piet draw calls.</p>
+<p>If I had to pick a programming job out of a hat, I hope it would be a job that involved more or less straightforward data transformation of the kind that svg-to-piet turned out to be.</p>
+<p>It wouldn't, however, involve writing Rust macros, which was the actual hard part of svg-to-piet.</p>
+<p>(Github: <a href="https://github.com/futurepaul/svg-to-piet">svg-to-piet</a>)</p>
+<h3>What's next?</h3>
+<p>I can't decide, tbh. This month was a great idea. I ended up with a portfolio I'm proud to share, and I learned a lot in each individual project. But I don't have another four projects of a similar character sitting on my back burner. I have a bunch of vague ideas that require education and exploration, which is a much more meandering process.</p>
+<p>If you'd like to help me pick my next project, <a href="mailto:paul@pauljmiller.com">perhaps consider hiring me</a>!</p>
+]]>
+      </description>
+    </item>
+    <item>
+      <title>
+        How to fix the internet
+      </title>
+      <link>https://pauljmiller.com/posts/how-to-fix-the-internet.html</link>
+      <pubDate>Thu, 20 Jun 2019 00:45:59 +0000</pubDate>
+      <guid>https://pauljmiller.com/posts/how-to-fix-the-internet.html</guid>
+      <description>
+        <![CDATA[<p>Here's my idea in a nutshell: make it more like WordPress. Take any popular service you use from The Big Bad Tech Boys and make it more like WordPress.</p>
+<p>I'm giving you the least glamorous version of my idea up front to build trust. Is it working? Please don't leave. I understand that very few people love WordPress, especially not the people who work with it on a regular basis. WordPress is slow, old, bloated, complicated, and historically insecure.</p>
+<p>Also, WordPress powers roughly 30 percent of the top 10 million websites. So not only is my idea bad, it's also the status quo.</p>
+<p>But!</p>
+<p>What if stuff was more like WordPress?</p>
+<p>Let's say I want to start a new YouTube channel. But instead of starting it on YouTube, I start it à la WordPress.</p>
+<ol>
+<li>I buy a domain name, or <a href="https://elephantnames.com">use one I already own</a>.</li>
+<li>I set up hosting and connect it to my domain.</li>
+<li>I install a YouTube-like CMS on my server (instead of WordPress).</li>
+<li>I add videos, information, and design tweaks to the channel.</li>
+<li>Nobody ever discovers my videos because they're not on YouTube.</li>
+</ol>
+<p>Okay, so step five sounds disheartening. But we could solve this the way podcasts solved it: apps!</p>
+<p>See, podcasts are like WordPress blogs. In fact, many podcasts that are hosted DIY, instead of through a platform like SoundCloud or Anchor, publish via WordPress.</p>
+<p>A podcast is just:</p>
+<ol>
+<li>An RSS feed.</li>
+<li>A set of MP3s.</li>
+</ol>
+<p>It turns out, it's really straightforward to write an app that can subscribe to RSS feeds and play MP3 files. Hence the proliferation of podcast-listening apps.</p>
+<p>So if our WordPress-like YouTube replacement was just:</p>
+<ol>
+<li>An RSS feed.</li>
+<li>A set of videos.</li>
+</ol>
+<p>We'd be doing pretty well, yes?</p>
+<p>This is where we get to the inevitable: &quot;That sounds like an obvious idea. If it were also a <em>good</em> idea, it would've already been done. Therefore it must not be good.&quot;</p>
+<p>Maybe.</p>
+<p>Or perhaps we haven't had the incentive to self-publish our own video channels before now. YouTube was a good enough. The upsides, like discoverability and monetization, far outweighed the downsides: not owning your own distribution, a capricious algorithm, Google's discretion as to what's appropriate.</p>
+<p>Hosting the videos is expensive, especially if we want anything close to the low latency and high quality of YouTube. And there's very little incentive to build a high quality app for these video channels because they don't exist (a classic chicken / egg scenario).</p>
+<p>Also, for some reason, Google is the only company on earth with the budget to create a really good video player for the web.</p>
+<h3>Fast-forward to the year 2025</h3>
+<p>There are many well-established content types. Just like .txt / .doc / .png, except for things like .tweet, .podcast, .video, .blog.</p>
+<p>When I want to publish some content, let's say a video, I use my favorite app to package it into a standard .video file. That file is basically just the real video file, plus any metadata the .video format requires, such as title, description, etc.</p>
+<p>I publish &quot;paul-minecraft-lets-play-episode-4190.video&quot; to my home server. My home server is just a black box in my closet that's plugged into power and ethernet.</p>
+<p>My home server updates a list of .video files with the hash of my latest .video file and serves this file (like an RSS feed, except in the year 2025 maybe we don't use XML anymore). If I'm a very popular video creator, my home server seeds the video to a bunch of CDNs that serve the bulk of traffic. If I'm very controversial (I always dig straight down), perhaps my videos are only torrented. Or if only my mom watches my Let's Plays, she can probably load the video directly from my home server without a problem.</p>
+<p>A subscriber is notified of my upload on her phone, because in this fantastical future, if you subscribe and click the bell icon, notifications actually work. She opens her app of choice for consuming this content. It might be an app focused only on .video subscriptions, or an app that can handle many different content type feeds.</p>
+<p>If she likes the video, she can click the &quot;fav&quot; button and leave a comment, just like in the year 2019. But her fav and her comment aren't published to my server, or to a central server like YouTube, they're published to her server. A .comment file, a .liked index.</p>
+<p>Insofar as the videos and other content she enjoys are presented to her via algorithm, it's an algorithm she chose herself that runs on her own server against her own data.</p>
+<p>Someone who follows her .video channel, or her .blog channel, might be more likely to see my video in the &quot;Other recommended channels&quot; list. Or not! It's up to her. My server is simply notified that she's published a comment, and I can publish a reference to her comment without hosting it myself.</p>
+<h3>Some notes of clarification on what the future's like</h3>
+<p>I think what we'll see very clearly in hindsight is that when we published our content on other people's servers, it always went bad. Instagram's algo made us sad. YouTube's algo made us mad. Twitter's algo mad us sad AND mad. Google Photos algo, it turned out, made us easily tracked and controlled by totalitarian governments. Oops!</p>
+<p>Self-hosting will be the &quot;difficult&quot; and &quot;cumbersome&quot; option for a while, but by the year 2025 it will be easier than the centralized services are. Think about it: have you ever tried to upload a YouTube video? There are a ton of options, and the interface is kind of annoying, and it's a many-step process. This is because YouTube has to be designed to be a jack of all uploading trades, master of none. But when self-hosting is mature and common, you'll be able to pay for a highly specific app that streamlines the experience to match your exact needs. If you don't want to pay for a high-end app there will likely be a more general, harder-to-use, free and open source option as well.</p>
+<p>And: any things that <em>are</em> difficult about self-hosting are directly related to self-determination. &quot;Nobody is obliged to host your shitty Let's Play. It's two gigabytes. You swear a lot, so we can't use it to sell soap. Four people watch it. And three of those people hit the thumbs down button.&quot; Correct.</p>
+<p>What about popular, non-controversial content? Does this system work for that? &quot;Caching is a hard problem&quot; is something you might've heard. I don't think we'll have a perfectly decentralized internet by 2025 that can outpace high quality CDN services. But I do think we'll have new ways to pay CDNs for their service. A big company who wants its detergent ad seen by millions with a low buffer time might pay CDNs up front. But barely monetized user-created content might be mirrored by CDNs in exchange for some kind of per-use payment from viewers.</p>
+<p>Standardizing on different content types is obviously a whole can of worms in itself. It does seem to be an improvement, however, on the current situation, where we have basically three main &quot;open&quot; content types for publishing:</p>
+<ol>
+<li>RSS (for blogs)</li>
+<li>Apple's bastardized RSS (for podcasts)</li>
+<li>WWW, which is possibly the most complicated spec of all time.</li>
+</ol>
+<p>I think WWW's ongoing role will be for discovering new content types, for interactive media, and for application distribution (maybe). But for well-established content types I think it adds way too much complication and bloat. If you think about it, most of what proprietary systems add to well-established content types is a way to consume them <em>without</em> the pain and suffering of WWW. Medium, Twitter, Google Photos, YouTube, etc. Of course, in all of these cases, can serve as a completely fine fallback when you don't have the appropriate app.</p>
+<h3>How do we get there from here?</h3>
+<p>If I knew exactly what the next step was, I'd be foolish to not be working on it. And yet look at me: blogging! I think, perhaps, creating easy-to-use self publishing systems (that put content on a creator's own Digital Ocean server, while we wait for the black box home server to arrive) is the right thing to do.</p>
+<p>But do the content types need to exist first? Should I create a content type for &quot;.blog&quot; (probably Markdown with some TOML on top) and see if anybody likes using it? I tried to make a podcast generator entirely based on MP3 metadata but that was pretty difficult and probably not the right approach.</p>
+<p>Should hosting be stateful, like a WordPress blog with a MySQL backend, or stateless, like a Hugo blog built with a static site generator? For plain text blogs, the static site generator works great, but if video files and images are involved we might want some sort of object storage?</p>
+<p>Do the apps that consume this content need to truly know about the different content types? Could we do all of this by bastardizing RSS, like podcasts did?</p>
+<p>Should I be looking into Activity Streams? Or is that just WWW being needlessly complicated again?</p>
+<p>What we need:</p>
+<ol>
+<li>Tools to package content for distribution.</li>
+<li>Services to self-publish that content with minimal effort.</li>
+<li>Apps to subscribe to channels and enjoy the content.</li>
+</ol>
+<p>And, hopefully, all three steps will involve standard protocols and formats.</p>
+<p>Then, once all of this works, we can build toward feature parity with existing services by closing the loop: the app you use to enjoy video channels can also publish comments to your home server, which are then somehow linked to by the video publisher's server. It gets dicey and unsolved-problem-ey!</p>
+<p>All of this without monetizing via scam or raising money in such a way that incentivizes centralization. Most Web 3.0 efforts, sadly, fail this test. Maybe I should be taking <a href="https://solid.inrupt.com/how-it-works">Sir Tim Berners-Lee's Solid</a> more seriously, but it feels needlessly alien to me.</p>
+<p>So, please hit me up on Twitter and let me know what you think, let me know if you want to help, and let me know if you have any hot tips.</p>
+<p>I think a better internet is possible. It should be more like WordPress, I think. As long as it isn't literally WordPress. Because it should be more app-ish. Also, I'm not going to bother to learn PHP after all these years.</p>
+]]>
+      </description>
+    </item>
+    <item>
+      <title>
         A Keyboard Placement Manifesto
       </title>
       <link>https://pauljmiller.com/posts/keyboard-in-the-front-club.html</link>
@@ -28,7 +679,7 @@
       <guid>https://pauljmiller.com/posts/keyboard-in-the-front-club.html</guid>
       <description>
         <![CDATA[<p>The Keyboard In The Front Club <a href="https://pauljmiller.com/manifesto.txt">manifesto.txt</a>, presented without modification outside of appropriate line breaks.</p>
-<pre><code>          A Keyboard Placement Manifesto
+<pre style="white-space: pre-wrap;">          A Keyboard Placement Manifesto
 
                  by Paul Miller
 
@@ -51,8 +702,7 @@ Please send me $20 if you want to join the club.
 
 Thanks,
 Paul 
-</code></pre>
-]]>
+</pre>]]>
       </description>
     </item>
     <item>

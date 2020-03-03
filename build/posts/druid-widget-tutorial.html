@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>
+    
+    Building a widget for Druid
+    
+  </title>
+  <link rel="shortcut icon" href="/static/favicon.ico" />
+  <link rel="stylesheet" href="/static/normalize.css" />
+  <link rel="stylesheet" href="/static/main.css" />
+  <link rel="alternate" type="application/rss+xml" title="Paul's blog" href="/rss.xml" />
+</head>
+
+<body>
+  <header>
+    <h1><a class="active" href="https://pauljmiller.com">Paul's blog</a><a href="/projects.html">projects</a></h1>
+  </header>
+
+<main>
+  <article>
+    <h1>Building a widget for Druid</h1>
+    <h2>A fun thing to do</h2>
+
+    <p>Want to build a desktop app? You probably want to use Electron or Qt or GTK or a native toolkit.</p>
+<p>Want to build a thing that you could (maybe) <em>someday</em> use to build a native desktop app? <a href="https://github.com/xi-editor/druid">Contribute to Druid</a>!</p>
+<p>Druid is a work-in-progress, open source &quot;data-oriented Rust UI design toolkit.&quot; You can use it right now to build <em>very</em> feature-incomplete desktop applications for macOS, Windows, and Linux.</p>
+<p>For most of 2019 I've been contributing to Druid in the form of widgets. Exciting UI elements like: a button with rounded corners! A progress bar with rounded corners! A checkbox with rounded corners! A textbox with rounded corners!</p>
+<p>It's not much, but it's honest work.</p>
+<p>One thing I'm really enjoying about Druid is that at the widget level I control every pixel. Druid is a UI framework, sort of like React is for the web, but it uses a 2D graphics library called Piet to actually put pixels on the screen. Drawing my own widgets from scratch, instead of just styling someone else's widgets, was a big conceptual leap at first for me, but it quickly turned into an extremely satisfying activity.</p>
+<p>So, I'd like to walk you through the widget creation process. Perhaps you too will adopt this widget-creation hobby and help me fill out Druid's palette of default elements! I think we'd all like to live in a world where an open source project like Druid can build feature-<em>complete</em> desktop applications, but first <em>somebody</em> has to build that world.</p>
+<h2>1. What is a widget?</h2>
+<p>In Druid, &quot;Widget&quot; is a trait. So to make a new kind of widget, you just make a new type and then implement <code>Widget</code> on it.</p>
+<p>Let’s use a color picker widget as an example:</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">struct </span><span style="color:#323232;">ColorPicker;
+</span><span style="color:#323232;">
+</span><span style="font-weight:bold;color:#a71d5d;">impl </span><span style="color:#323232;">Widget </span><span style="font-weight:bold;color:#a71d5d;">for </span><span style="color:#323232;">ColorPicker {
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">fn </span><span style="font-weight:bold;color:#795da3;">paint</span><span style="color:#323232;">(...) {</span><span style="font-weight:bold;color:#a71d5d;">...</span><span style="color:#323232;">}
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">fn </span><span style="font-weight:bold;color:#795da3;">layout</span><span style="color:#323232;">(...) {</span><span style="font-weight:bold;color:#a71d5d;">...</span><span style="color:#323232;">}
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">fn </span><span style="font-weight:bold;color:#795da3;">event</span><span style="color:#323232;">(...) {</span><span style="font-weight:bold;color:#a71d5d;">...</span><span style="color:#323232;">}
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">fn </span><span style="font-weight:bold;color:#795da3;">update</span><span style="color:#323232;">(...) {</span><span style="font-weight:bold;color:#a71d5d;">...</span><span style="color:#323232;">}
+</span><span style="color:#323232;">}
+</span></pre>
+<p>And we're done!</p>
+<p>To use our <code>ColorPicker</code> widget, we include the widget as part of a widget hierarchy. Then it's Druid's job to send events to widgets as appropriate and to update widgets as appropriate with new data when the app's state changes.</p>
+<p>The widget's methods are generally are called in this order (it’s possible for a widget to receive <code>update</code> without ever receiving <code>event</code>):</p>
+<pre style="white-space: pre-wrap;">event -&gt; update -&gt; layout -&gt; paint
+</pre>
+<p>So an <code>event</code>, like a mouse clicking on our widget, could potentially cause a data <code>update</code>, and then we'll position and size the widget correctly with the <code>layout</code> method, and finally <code>paint</code> the widget to the screen.</p>
+<h2>2. Getting started</h2>
+<p>A great way to get started working on widgets in Druid is to clone the whole <a href="https://github.com/xi-editor/druid">repo</a> and then make a copy of <code>custom_widget.rs</code> in the examples directory. We'll call it <code>color_picker.rs</code>.</p>
+<p>So, in our case:</p>
+<pre style="white-space: pre-wrap;">cargo run --example color_picker
+</pre>
+<p>(If you're on macOS you'll need to <code>brew install cairo</code> first.)</p>
+<p>You should end up opening a window that looks something like this:
+<img src="../static/images/dw_1.png" alt="custom widget example" /></p>
+<p>This example has some minimal in-line documentation, so feel free to experiment.</p>
+<p>If it helps your mental model, here's what's happening when we launch this app:</p>
+<p>The <code>AppLauncher</code> is given a <code>WindowDesc</code> which holds a root widget called CustomWidget. At launch the app's initial state is the String <code>Druid + Piet</code>, which is passed to the widget tree. When we resize the window, the size constraint passed to CustomWidget is updated, and so the widget is redrawn to match its new size.</p>
+<h2>3. Painting with Piet</h2>
+<p>Before we think too hard about our data model (famous last words), let's get our own pixels on the screen.</p>
+<p>I think we should do a HSL color picker. This widget we're building can display and control the SL (Saturation and Lightness), and then we can add a slider to the app to control H (Hue).</p>
+<p>HSL can be represented as three floats in the range (0.0, 1.0). But Piet's <code>Color</code> type is RGBA under the hood, so we need to do some converting before we draw the color on the screen.</p>
+<p>Here's a handy HSL to RGB converter I just had laying around. Feel free to copy and paste because this isn't really the focus of this tutorial!</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">fn </span><span style="font-weight:bold;color:#795da3;">hue_to_rgb</span><span style="color:#323232;">(p: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">, q: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">, t: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">) -&gt; </span><span style="font-weight:bold;color:#a71d5d;">f64 </span><span style="color:#323232;">{
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">let mut</span><span style="color:#323232;"> t </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> t;
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">if</span><span style="color:#323232;"> t </span><span style="font-weight:bold;color:#a71d5d;">&lt; </span><span style="color:#0086b3;">0. </span><span style="color:#323232;">{
+</span><span style="color:#323232;">        </span><span style="color:#323232;">t </span><span style="font-weight:bold;color:#a71d5d;">+= </span><span style="color:#0086b3;">1.
+</span><span style="color:#323232;">    </span><span style="color:#323232;">}
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">if</span><span style="color:#323232;"> t </span><span style="font-weight:bold;color:#a71d5d;">&gt; </span><span style="color:#0086b3;">1. </span><span style="color:#323232;">{
+</span><span style="color:#323232;">        </span><span style="color:#323232;">t </span><span style="font-weight:bold;color:#a71d5d;">-= </span><span style="color:#0086b3;">1.
+</span><span style="color:#323232;">    </span><span style="color:#323232;">};
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">if</span><span style="color:#323232;"> t </span><span style="font-weight:bold;color:#a71d5d;">&lt; </span><span style="color:#0086b3;">1. </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#0086b3;">6. </span><span style="color:#323232;">{
+</span><span style="color:#323232;">        </span><span style="font-weight:bold;color:#a71d5d;">return</span><span style="color:#323232;"> p </span><span style="font-weight:bold;color:#a71d5d;">+ </span><span style="color:#323232;">(q </span><span style="font-weight:bold;color:#a71d5d;">-</span><span style="color:#323232;"> p) </span><span style="font-weight:bold;color:#a71d5d;">* </span><span style="color:#0086b3;">6. </span><span style="font-weight:bold;color:#a71d5d;">*</span><span style="color:#323232;"> t;
+</span><span style="color:#323232;">    </span><span style="color:#323232;">}
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">if</span><span style="color:#323232;"> t </span><span style="font-weight:bold;color:#a71d5d;">&lt; </span><span style="color:#0086b3;">1. </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#0086b3;">2. </span><span style="color:#323232;">{
+</span><span style="color:#323232;">        </span><span style="font-weight:bold;color:#a71d5d;">return</span><span style="color:#323232;"> q;
+</span><span style="color:#323232;">    </span><span style="color:#323232;">}
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">if</span><span style="color:#323232;"> t </span><span style="font-weight:bold;color:#a71d5d;">&lt; </span><span style="color:#0086b3;">2. </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#0086b3;">3. </span><span style="color:#323232;">{
+</span><span style="color:#323232;">        </span><span style="font-weight:bold;color:#a71d5d;">return</span><span style="color:#323232;"> p </span><span style="font-weight:bold;color:#a71d5d;">+ </span><span style="color:#323232;">(q </span><span style="font-weight:bold;color:#a71d5d;">-</span><span style="color:#323232;"> p) </span><span style="font-weight:bold;color:#a71d5d;">* </span><span style="color:#323232;">(</span><span style="color:#0086b3;">2. </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#0086b3;">3. </span><span style="font-weight:bold;color:#a71d5d;">-</span><span style="color:#323232;"> t) </span><span style="font-weight:bold;color:#a71d5d;">* </span><span style="color:#0086b3;">6.</span><span style="color:#323232;">;
+</span><span style="color:#323232;">    </span><span style="color:#323232;">}
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">return</span><span style="color:#323232;"> p;
+</span><span style="color:#323232;">}
+</span><span style="color:#323232;">
+</span><span style="font-weight:bold;color:#a71d5d;">fn </span><span style="font-weight:bold;color:#795da3;">hsl_to_rgb</span><span style="color:#323232;">(h: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">, s: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">, l: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">) -&gt; (</span><span style="font-weight:bold;color:#a71d5d;">u8</span><span style="color:#323232;">, </span><span style="font-weight:bold;color:#a71d5d;">u8</span><span style="color:#323232;">, </span><span style="font-weight:bold;color:#a71d5d;">u8</span><span style="color:#323232;">) {
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> r;
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> g;
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> b;
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">if</span><span style="color:#323232;"> s </span><span style="font-weight:bold;color:#a71d5d;">== </span><span style="color:#0086b3;">0.0 </span><span style="color:#323232;">{
+</span><span style="color:#323232;">        </span><span style="color:#323232;">r </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> l;
+</span><span style="color:#323232;">        </span><span style="color:#323232;">g </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> l;
+</span><span style="color:#323232;">        </span><span style="color:#323232;">b </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> l; </span><span style="font-style:italic;color:#969896;">// achromatic
+</span><span style="color:#323232;">    </span><span style="color:#323232;">} </span><span style="font-weight:bold;color:#a71d5d;">else </span><span style="color:#323232;">{
+</span><span style="color:#323232;">        </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> q </span><span style="font-weight:bold;color:#a71d5d;">= if</span><span style="color:#323232;"> l </span><span style="font-weight:bold;color:#a71d5d;">&lt; </span><span style="color:#0086b3;">0.5 </span><span style="color:#323232;">{ l </span><span style="font-weight:bold;color:#a71d5d;">* </span><span style="color:#323232;">(</span><span style="color:#0086b3;">1. </span><span style="font-weight:bold;color:#a71d5d;">+</span><span style="color:#323232;"> s) } </span><span style="font-weight:bold;color:#a71d5d;">else </span><span style="color:#323232;">{ l </span><span style="font-weight:bold;color:#a71d5d;">+</span><span style="color:#323232;"> s </span><span style="font-weight:bold;color:#a71d5d;">-</span><span style="color:#323232;"> l </span><span style="font-weight:bold;color:#a71d5d;">*</span><span style="color:#323232;"> s };
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">        </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> p </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#0086b3;">2. </span><span style="font-weight:bold;color:#a71d5d;">*</span><span style="color:#323232;"> l </span><span style="font-weight:bold;color:#a71d5d;">-</span><span style="color:#323232;"> q;
+</span><span style="color:#323232;">        </span><span style="color:#323232;">r </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#62a35c;">hue_to_rgb</span><span style="color:#323232;">(p, q, h </span><span style="font-weight:bold;color:#a71d5d;">+ </span><span style="color:#0086b3;">1. </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#0086b3;">3.</span><span style="color:#323232;">);
+</span><span style="color:#323232;">        </span><span style="color:#323232;">g </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#62a35c;">hue_to_rgb</span><span style="color:#323232;">(p, q, h);
+</span><span style="color:#323232;">        </span><span style="color:#323232;">b </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#62a35c;">hue_to_rgb</span><span style="color:#323232;">(p, q, h </span><span style="font-weight:bold;color:#a71d5d;">- </span><span style="color:#0086b3;">1. </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#0086b3;">3.</span><span style="color:#323232;">);
+</span><span style="color:#323232;">    </span><span style="color:#323232;">}
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">return </span><span style="color:#323232;">(
+</span><span style="color:#323232;">        </span><span style="color:#323232;">(r </span><span style="font-weight:bold;color:#a71d5d;">* </span><span style="color:#0086b3;">255.</span><span style="color:#323232;">).</span><span style="color:#62a35c;">round</span><span style="color:#323232;">() </span><span style="font-weight:bold;color:#a71d5d;">as u8</span><span style="color:#323232;">,
+</span><span style="color:#323232;">        </span><span style="color:#323232;">(g </span><span style="font-weight:bold;color:#a71d5d;">* </span><span style="color:#0086b3;">255.</span><span style="color:#323232;">).</span><span style="color:#62a35c;">round</span><span style="color:#323232;">() </span><span style="font-weight:bold;color:#a71d5d;">as u8</span><span style="color:#323232;">,
+</span><span style="color:#323232;">        </span><span style="color:#323232;">(b </span><span style="font-weight:bold;color:#a71d5d;">* </span><span style="color:#0086b3;">255.</span><span style="color:#323232;">).</span><span style="color:#62a35c;">round</span><span style="color:#323232;">() </span><span style="font-weight:bold;color:#a71d5d;">as u8</span><span style="color:#323232;">,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">);
+</span><span style="color:#323232;">}
+</span></pre>
+<p>Let's draw a color on the screen as a sanity check.</p>
+<p>Clear out the widget impl's <code>paint</code> method and put this in instead:</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">fn </span><span style="font-weight:bold;color:#795da3;">paint</span><span style="color:#323232;">(
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">&amp;mut </span><span style="color:#323232;">self,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">paint_ctx: </span><span style="font-weight:bold;color:#a71d5d;">&amp;mut</span><span style="color:#323232;"> PaintCtx,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">base_state: </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">BaseState,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">data: </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">String,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">_env: </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">Env,
+</span><span style="color:#323232;">) {
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> rgb </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#62a35c;">hsl_to_rgb</span><span style="color:#323232;">(</span><span style="color:#0086b3;">0.5</span><span style="color:#323232;">, </span><span style="color:#0086b3;">0.5</span><span style="color:#323232;">, </span><span style="color:#0086b3;">0.5</span><span style="color:#323232;">);
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> rect </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">Rect::from_origin_size(Point::</span><span style="color:#0086b3;">ORIGIN</span><span style="color:#323232;">, base_state.</span><span style="color:#62a35c;">size</span><span style="color:#323232;">());
+</span><span style="color:#323232;">    </span><span style="color:#323232;">paint_ctx.</span><span style="color:#62a35c;">fill</span><span style="color:#323232;">(rect, </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">Color::rgb8(rgb.</span><span style="color:#0086b3;">0</span><span style="color:#323232;">, rgb.</span><span style="color:#0086b3;">1</span><span style="color:#323232;">, rgb.</span><span style="color:#0086b3;">2</span><span style="color:#323232;">));
+</span><span style="color:#323232;">}
+</span></pre>
+<p>If everything goes well, you may discover a marvelous new shade of... blue? I think that's in the blue family.</p>
+<p><img src="../static/images/dw_2.png" alt="delightful blue widget" /></p>
+<p>Now let's draw our SL by repurposing that suspiciously convenient <code>make_image_data()</code> function at the bottom of this file.</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">fn </span><span style="font-weight:bold;color:#795da3;">make_sl_image</span><span style="color:#323232;">(width: </span><span style="font-weight:bold;color:#a71d5d;">usize</span><span style="color:#323232;">, height: </span><span style="font-weight:bold;color:#a71d5d;">usize</span><span style="color:#323232;">, hue: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">) -&gt; Vec&lt;</span><span style="font-weight:bold;color:#a71d5d;">u8</span><span style="color:#323232;">&gt; {
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">let mut</span><span style="color:#323232;"> image_data </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">vec![</span><span style="color:#0086b3;">0</span><span style="color:#323232;">; width </span><span style="font-weight:bold;color:#a71d5d;">*</span><span style="color:#323232;"> height </span><span style="font-weight:bold;color:#a71d5d;">* </span><span style="color:#0086b3;">4</span><span style="color:#323232;">];
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">for</span><span style="color:#323232;"> y </span><span style="font-weight:bold;color:#a71d5d;">in </span><span style="color:#0086b3;">0</span><span style="font-weight:bold;color:#a71d5d;">..</span><span style="color:#323232;">height {
+</span><span style="color:#323232;">        </span><span style="font-weight:bold;color:#a71d5d;">for</span><span style="color:#323232;"> x </span><span style="font-weight:bold;color:#a71d5d;">in </span><span style="color:#0086b3;">0</span><span style="font-weight:bold;color:#a71d5d;">..</span><span style="color:#323232;">width {
+</span><span style="color:#323232;">            </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> ix </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">(y </span><span style="font-weight:bold;color:#a71d5d;">*</span><span style="color:#323232;"> width </span><span style="font-weight:bold;color:#a71d5d;">+</span><span style="color:#323232;"> x) </span><span style="font-weight:bold;color:#a71d5d;">* </span><span style="color:#0086b3;">4</span><span style="color:#323232;">;
+</span><span style="color:#323232;">            </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> x_ratio </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> x </span><span style="font-weight:bold;color:#a71d5d;">as f64 /</span><span style="color:#323232;"> width </span><span style="font-weight:bold;color:#a71d5d;">as f64</span><span style="color:#323232;">;
+</span><span style="color:#323232;">            </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> y_ratio </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> y </span><span style="font-weight:bold;color:#a71d5d;">as f64 /</span><span style="color:#323232;"> width </span><span style="font-weight:bold;color:#a71d5d;">as f64</span><span style="color:#323232;">;
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">            </span><span style="font-style:italic;color:#969896;">// Where the magic happens
+</span><span style="color:#323232;">            </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> color </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#62a35c;">hsl_to_rgb</span><span style="color:#323232;">(hue, x_ratio, y_ratio);
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">            </span><span style="color:#323232;">image_data[ix </span><span style="font-weight:bold;color:#a71d5d;">+ </span><span style="color:#0086b3;">0</span><span style="color:#323232;">] </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> color.</span><span style="color:#0086b3;">0</span><span style="color:#323232;">;
+</span><span style="color:#323232;">            </span><span style="color:#323232;">image_data[ix </span><span style="font-weight:bold;color:#a71d5d;">+ </span><span style="color:#0086b3;">1</span><span style="color:#323232;">] </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> color.</span><span style="color:#0086b3;">1</span><span style="color:#323232;">;
+</span><span style="color:#323232;">            </span><span style="color:#323232;">image_data[ix </span><span style="font-weight:bold;color:#a71d5d;">+ </span><span style="color:#0086b3;">2</span><span style="color:#323232;">] </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> color.</span><span style="color:#0086b3;">2</span><span style="color:#323232;">;
+</span><span style="color:#323232;">            </span><span style="color:#323232;">image_data[ix </span><span style="font-weight:bold;color:#a71d5d;">+ </span><span style="color:#0086b3;">3</span><span style="color:#323232;">] </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#0086b3;">255
+</span><span style="color:#323232;">        </span><span style="color:#323232;">}
+</span><span style="color:#323232;">    </span><span style="color:#323232;">}
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">    </span><span style="color:#323232;">image_data
+</span><span style="color:#323232;">}
+</span></pre>
+<p>I promise you that most of Piet isn't creating your own <code>Vec&lt;u8&gt;</code> image buffers from scratch, but that doesn't mean you can't enjoy these occasions.</p>
+<p>Now let's return to the paint method and draw the image:</p>
+<pre style="background-color: #eff0f1;"><span style="font-style:italic;color:#969896;">// We&#39;re generating a 256 by 256 pixels image, with a constant hue of 0.5
+</span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> image_data </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#62a35c;">make_sl_image</span><span style="color:#323232;">(</span><span style="color:#0086b3;">256</span><span style="color:#323232;">, </span><span style="color:#0086b3;">256</span><span style="color:#323232;">, </span><span style="color:#0086b3;">0.5</span><span style="color:#323232;">);
+</span><span style="color:#323232;">
+</span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> image </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> paint_ctx
+</span><span style="color:#323232;">    </span><span style="color:#323232;">.</span><span style="color:#62a35c;">make_image</span><span style="color:#323232;">(</span><span style="color:#0086b3;">256</span><span style="color:#323232;">, </span><span style="color:#0086b3;">256</span><span style="color:#323232;">, </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">image_data, ImageFormat::RgbaSeparate)
+</span><span style="color:#323232;">    </span><span style="color:#323232;">.</span><span style="color:#62a35c;">unwrap</span><span style="color:#323232;">();
+</span><span style="color:#323232;">
+</span><span style="font-style:italic;color:#969896;">// When piet draws our image it will stretch it automatically.
+</span><span style="font-style:italic;color:#969896;">// We&#39;ll fix this later by giving our widget a fixed size.
+</span><span style="color:#323232;">paint_ctx.</span><span style="color:#62a35c;">draw_image</span><span style="color:#323232;">(
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">image,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">Rect::from_origin_size(Point::</span><span style="color:#0086b3;">ORIGIN</span><span style="color:#323232;">, base_state.</span><span style="color:#62a35c;">size</span><span style="color:#323232;">()),
+</span><span style="color:#323232;">    </span><span style="color:#323232;">InterpolationMode::Bilinear,
+</span><span style="color:#323232;">);
+</span></pre>
+<p>Okay, so we're the king of gradients now. But how about interactivity?</p>
+<h2>4. Paint a rectangle</h2>
+<p>To put the &quot;picker&quot; in color picker, let's draw a rectangular cursor that we can move around.</p>
+<p>Our cursor will need an x and y coordinate to be drawn at, and that will require some modicum of statefulness. For now, let's make it private to our widget.</p>
+<p>If you haven't renamed the <code>CustomWidget</code> struct yet, now is your moment!</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">struct </span><span style="color:#323232;">ColorPicker {
+</span><span style="color:#323232;">    </span><span style="color:#323232;">cursor_x: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">cursor_y: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">,
+</span><span style="color:#323232;">}
+</span></pre>
+<p>Let's initialize ColorPicker with some default values in <code>main()</code>:</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> window </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">WindowDesc::new(|| ColorPicker { cursor_x: </span><span style="color:#0086b3;">0.2</span><span style="color:#323232;">, cursor_y: </span><span style="color:#0086b3;">0.9 </span><span style="color:#323232;">});
+</span></pre>
+<p>Now let's draw a black rectangle at that (x, y) position. Inside our paint method, below the call to <code>draw_image()</code>:</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> cursor_rect </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">Rect::from_origin_size((</span><span style="color:#0086b3;">100.</span><span style="color:#323232;">, </span><span style="color:#0086b3;">100.</span><span style="color:#323232;">), (</span><span style="color:#0086b3;">10.</span><span style="color:#323232;">, </span><span style="color:#0086b3;">10.</span><span style="color:#323232;">));
+</span><span style="color:#323232;">paint_ctx.</span><span style="color:#62a35c;">stroke</span><span style="color:#323232;">(cursor_rect, </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">Color::</span><span style="color:#0086b3;">BLACK</span><span style="color:#323232;">, </span><span style="color:#0086b3;">1.0</span><span style="color:#323232;">);
+</span></pre>
+<p>That paints a black-stroked rectangle at the point (100., 100.), with the size of (10., 10.). I know that doesn't use our <code>cursor_x</code> / <code>y</code>, but I just wanted to show you the basic pixel positioning version real quick before we get fancy and use a <code>UnitPoint</code> for positioning.</p>
+<p><img src="../static/images/dw_3.png" alt="we drew a rectangle" /></p>
+<p>Okay, fancy time:</p>
+<pre style="background-color: #eff0f1;"><span style="font-style:italic;color:#969896;">// Create a UnitPoint from our cursor floats
+</span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> cursor_point </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">druid::piet::UnitPoint::new(self.cursor_x, self.cursor_y);
+</span><span style="font-style:italic;color:#969896;">// Create a rect that&#39;s the size of our whole widget
+</span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> resolve_rect </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">Rect::from_origin_size(Point::</span><span style="color:#0086b3;">ORIGIN</span><span style="color:#323232;">, base_state.</span><span style="color:#62a35c;">size</span><span style="color:#323232;">());
+</span><span style="font-style:italic;color:#969896;">// Calling resolve on the UnitPoint returns a Point relative to the rectangle it&#39;s passed
+</span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> resolved_point </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> cursor_point.</span><span style="color:#62a35c;">resolve</span><span style="color:#323232;">(resolve_rect);
+</span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> cursor_rect </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">Rect::from_origin_size(resolved_point, (</span><span style="color:#0086b3;">10.</span><span style="color:#323232;">, </span><span style="color:#0086b3;">10.</span><span style="color:#323232;">));
+</span><span style="color:#323232;">paint_ctx.</span><span style="color:#62a35c;">stroke</span><span style="color:#323232;">(cursor_rect, </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">Color::</span><span style="color:#0086b3;">BLACK</span><span style="color:#323232;">, </span><span style="color:#0086b3;">1.0</span><span style="color:#323232;">);
+</span></pre>
+<p>Beautiful.</p>
+<p>One last thing to draw: an inset white rectangle to make our cursor visible over dark zones.</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> inset_point </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> resolved_point </span><span style="font-weight:bold;color:#a71d5d;">+ </span><span style="color:#323232;">druid::kurbo::Vec2::new(</span><span style="color:#0086b3;">1.</span><span style="color:#323232;">, </span><span style="color:#0086b3;">1.</span><span style="color:#323232;">);
+</span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> white_cursor_rect </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">Rect::from_origin_size(inset_point, (</span><span style="color:#0086b3;">8.</span><span style="color:#323232;">, </span><span style="color:#0086b3;">8.</span><span style="color:#323232;">));
+</span><span style="color:#323232;">paint_ctx.</span><span style="color:#62a35c;">stroke</span><span style="color:#323232;">(white_cursor_rect, </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">Color::rgba8(</span><span style="color:#0086b3;">255</span><span style="color:#323232;">, </span><span style="color:#0086b3;">255</span><span style="color:#323232;">, </span><span style="color:#0086b3;">255</span><span style="color:#323232;">, </span><span style="color:#0086b3;">128</span><span style="color:#323232;">), </span><span style="color:#0086b3;">1.0</span><span style="color:#323232;">);
+</span></pre>
+<p>Note the tasteful use of transparency in the fourth or fifth method of color creation I've shown thus far.</p>
+<h2>5. Adding interactivity</h2>
+<p>Time to move on to the <code>fn event()</code> method! The <code>event()</code> method receives an <code>Event</code> called <code>event</code> that we can match on:</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">fn </span><span style="font-weight:bold;color:#795da3;">event</span><span style="color:#323232;">(</span><span style="font-weight:bold;color:#a71d5d;">&amp;mut </span><span style="color:#323232;">self, event: </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">Event, _ctx: </span><span style="font-weight:bold;color:#a71d5d;">&amp;mut</span><span style="color:#323232;"> EventCtx, _data: </span><span style="font-weight:bold;color:#a71d5d;">&amp;mut</span><span style="color:#323232;"> String, _env: </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">Env) {
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">match</span><span style="color:#323232;"> event {
+</span><span style="color:#323232;">        </span><span style="color:#323232;">Event::MouseDown(mouse) </span><span style="font-weight:bold;color:#a71d5d;">=&gt; </span><span style="color:#323232;">{
+</span><span style="color:#323232;">            </span><span style="color:#323232;">dbg!(mouse);
+</span><span style="color:#323232;">        </span><span style="color:#323232;">},
+</span><span style="color:#323232;">        </span><span style="font-weight:bold;color:#a71d5d;">_ =&gt; </span><span style="color:#323232;">(),
+</span><span style="color:#323232;">    </span><span style="color:#323232;">}
+</span><span style="color:#323232;">}
+</span></pre>
+<p>If you run the app and click anywhere inside the window, you should get some helpful info about the <code>MouseEvent</code> printed to the terminal.</p>
+<p>Here's what mine said:</p>
+<pre style="white-space: pre-wrap;">[examples/color_picker.rs:133] mouse = MouseEvent {
+    pos: (260.84375, 203.609375),
+    mods: Mods(None),
+    count: 1,
+    button: Left,
+}
+</pre>
+<p>So what we want to do is take that position, <code>UnitPoint</code>-ify it, and set <code>self.cursor_x</code> / <code>self.cursor_y</code> to that.</p>
+<p>But here's the thing: we need to know how big the widget is to calculate a 0.0 -&gt; 1.0 value, and we can't access that size information from inside the event handler. So: more state!</p>
+<p>Add a size field to our struct.</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">struct </span><span style="color:#323232;">ColorPicker {
+</span><span style="color:#323232;">    </span><span style="color:#323232;">cursor_x: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">cursor_y: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">size: Size,
+</span><span style="color:#323232;">}
+</span></pre>
+<p>And initialize it as <code>Size::default()</code>.</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> window </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">WindowDesc::new(|| ColorPicker {
+</span><span style="color:#323232;">    </span><span style="color:#323232;">cursor_x: </span><span style="color:#0086b3;">0.2</span><span style="color:#323232;">,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">cursor_y: </span><span style="color:#0086b3;">0.9</span><span style="color:#323232;">,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">size: Size::default()
+</span><span style="color:#323232;">});
+</span></pre>
+<p>Inside the widget's <code>layout</code> method we'll set the size to equal the max <code>BoxConstraints</code> our widget is passed and then return that.</p>
+<pre style="background-color: #eff0f1;"><span style="color:#323232;">self.size </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> bc.</span><span style="color:#62a35c;">max</span><span style="color:#323232;">();
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">self.size
+</span></pre>
+<p>And now, finally, we can do our calculation inside the <code>event</code> method:</p>
+<pre style="background-color: #eff0f1;"><span style="color:#323232;">Event::MouseDown(mouse) </span><span style="font-weight:bold;color:#a71d5d;">=&gt; </span><span style="color:#323232;">{
+</span><span style="color:#323232;">    </span><span style="color:#323232;">self.cursor_x </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> mouse.pos.x </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#323232;">self.size.width;
+</span><span style="color:#323232;">    </span><span style="color:#323232;">self.cursor_y </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> mouse.pos.y </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#323232;">self.size.height;
+</span><span style="color:#323232;">    </span><span style="color:#323232;">dbg!(self.cursor_x, self.cursor_y);
+</span><span style="color:#323232;">},
+</span></pre>
+<p>Run that and... Oh no! The cursor isn't moving! This was my clever plan to get you to notice one very important part of widget-building:</p>
+<pre style="background-color: #eff0f1;"><span style="color:#323232;">ctx.</span><span style="color:#62a35c;">invalidate</span><span style="color:#323232;">();
+</span></pre>
+<p>Invalidate marks this widget as &quot;dirty,&quot; so now Druid knows to redraw it on its next pass. Add this line below those cursor calculations in <code>event</code> and you should have your first interactive Druid widget up and running! Congrats.</p>
+<h2>6. Better event handling</h2>
+<p><img src="../static/images/dw_anim_small.gif" alt="interactive example" /></p>
+<p>If you click around you'll notice the cursor doesn't move exactly how you'd expect, especially when you click and drag. That's because you've used a color picker before, and you have expectations. This is the &quot;game&quot; of making widgets: if it looks like a widget people have used before, it needs to behave in a way that those prior experiences have conditioned them for.</p>
+<p>To be specific: in our case, we need to handle <code>Event::MouseMoved</code> inside our <code>event</code> match statement.</p>
+<pre style="background-color: #eff0f1;"><span style="color:#323232;">Event::MouseMoved(mouse) </span><span style="font-weight:bold;color:#a71d5d;">=&gt; </span><span style="color:#323232;">{
+</span><span style="color:#323232;">    </span><span style="color:#323232;">self.cursor_x </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> mouse.pos.x </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#323232;">self.size.width;
+</span><span style="color:#323232;">    </span><span style="color:#323232;">self.cursor_y </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> mouse.pos.y </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#323232;">self.size.height;
+</span><span style="color:#323232;">    </span><span style="color:#323232;">ctx.</span><span style="color:#62a35c;">invalidate</span><span style="color:#323232;">();
+</span><span style="color:#323232;">},
+</span></pre>
+<p>If you run that, you'll notice it works a little too well: now the cursor follows your mouse around no matter what.</p>
+<p>In the <code>MouseDown</code> event we need to set the widget as &quot;active,&quot; and then when we move the cursor we can check if we're active. And so, of course, we'll also need a <code>MouseUp</code> event to turn off active.</p>
+<pre style="background-color: #eff0f1;"><span style="color:#323232;">Event::MouseDown(mouse) </span><span style="font-weight:bold;color:#a71d5d;">=&gt; </span><span style="color:#323232;">{
+</span><span style="color:#323232;">    </span><span style="color:#323232;">ctx.</span><span style="color:#62a35c;">set_active</span><span style="color:#323232;">(</span><span style="color:#0086b3;">true</span><span style="color:#323232;">);
+</span><span style="color:#323232;">    </span><span style="color:#323232;">self.cursor_x </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> mouse.pos.x </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#323232;">self.size.width;
+</span><span style="color:#323232;">    </span><span style="color:#323232;">self.cursor_y </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> mouse.pos.y </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#323232;">self.size.height;
+</span><span style="color:#323232;">    </span><span style="color:#323232;">ctx.</span><span style="color:#62a35c;">invalidate</span><span style="color:#323232;">();
+</span><span style="color:#323232;">},
+</span><span style="color:#323232;">Event::MouseMoved(mouse) </span><span style="font-weight:bold;color:#a71d5d;">=&gt; </span><span style="color:#323232;">{
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">if</span><span style="color:#323232;"> ctx.</span><span style="color:#62a35c;">is_active</span><span style="color:#323232;">() {
+</span><span style="color:#323232;">        </span><span style="color:#323232;">self.cursor_x </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> mouse.pos.x </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#323232;">self.size.width;
+</span><span style="color:#323232;">        </span><span style="color:#323232;">self.cursor_y </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> mouse.pos.y </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#323232;">self.size.height;
+</span><span style="color:#323232;">        </span><span style="color:#323232;">ctx.</span><span style="color:#62a35c;">invalidate</span><span style="color:#323232;">();
+</span><span style="color:#323232;">    </span><span style="color:#323232;">}
+</span><span style="color:#323232;">},
+</span><span style="color:#323232;">Event::MouseUp(</span><span style="font-weight:bold;color:#a71d5d;">_</span><span style="color:#323232;">) </span><span style="font-weight:bold;color:#a71d5d;">=&gt; </span><span style="color:#323232;">{
+</span><span style="color:#323232;">    </span><span style="color:#323232;">ctx.</span><span style="color:#62a35c;">set_active</span><span style="color:#323232;">(</span><span style="color:#0086b3;">false</span><span style="color:#323232;">);
+</span><span style="color:#323232;">},
+</span><span style="font-weight:bold;color:#a71d5d;">_ =&gt; </span><span style="color:#323232;">(),
+</span></pre>
+<p>You'll notice we're working with the mutable <code>EventCtx</code> object, which is a bit of a grab bag of functionality. I won't go into it all here, I'm just giving you a heads up in case you're wondering how to do X and you find out later that X is a method on <code>EventCtx</code>.</p>
+<h2>7. Dealing with Data</h2>
+<p>Right now our app functional but... incomplete. One limitation is the fact that we have no idea what color value we've selected unless we print it to the terminal. Let's fix that.</p>
+<p>You might have noticed that we're still passing a <code>String</code> to our root widget at app launch. Let's change that to a custom <code>ColorState</code> struct, and make a new <code>HSL</code> color type for it to hold.</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">use </span><span style="color:#323232;">druid::{Data, </span><span style="font-weight:bold;color:#a71d5d;">...</span><span style="color:#323232;">};
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">#[derive(Clone, Data)]
+</span><span style="font-weight:bold;color:#a71d5d;">struct </span><span style="color:#323232;">HSL {
+</span><span style="color:#323232;">    </span><span style="color:#323232;">hue: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">saturation: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">lightness: </span><span style="font-weight:bold;color:#a71d5d;">f64
+</span><span style="color:#323232;">}
+</span></pre>
+<p>The <code>Data</code> trait has to be implemented for any data that flows through our app; Druid uses it to determine when changes have occured that our widget needs to know about. <code>Data</code> can be derived in most cases; what’s important is that types that implement <code>Data</code> should be fairly cheap to clone and compare. Importantly, <code>Data</code> is implemented automatically for primitive types, as well as for <code>Arc&lt;T&gt;</code> and <code>Rc&lt;T&gt;</code>; if you're using a more complicated type, you can always wrap it in one of those smart pointers.</p>
+<p>Right now our <code>ColorPicker</code> widget only accepts data of type <code>String</code>. Change it to <code>HSL</code>.</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">impl </span><span style="color:#323232;">Widget&lt;HSL&gt; </span><span style="font-weight:bold;color:#a71d5d;">for </span><span style="color:#323232;">ColorPicker {
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">...
+</span><span style="color:#323232;">}
+</span></pre>
+<p>Then, in the AppLauncher, change the initial state to an <code>HSL</code> object with your favorite initial values.</p>
+<pre style="background-color: #eff0f1;"><span style="color:#323232;">.</span><span style="color:#62a35c;">launch</span><span style="color:#323232;">(</span><span style="color:#0086b3;">HSL </span><span style="color:#323232;">{ hue: </span><span style="color:#0086b3;">0.4</span><span style="color:#323232;">, saturation: </span><span style="color:#0086b3;">0.4</span><span style="color:#323232;">, lightness: </span><span style="color:#0086b3;">0.4 </span><span style="color:#323232;">})
+</span></pre>
+<p>We also need to change the type of the data field in each of our widget methods from <code>&amp;String</code> / <code>&amp;mut String</code> to <code>&amp;HSL</code> / <code>&amp;mut HSL</code>.</p>
+<p>And now that <em>that's</em> all wired up, we can go around and change all of our <code>self.cursor_x</code> and <code>self.cursor_y</code> out for <code>data.saturation</code> and <code>data.lightness</code> respectively and delete <code>cursor_x</code> / <code>cursor_y</code> from the ColorPicker struct. In a sense, we've &quot;lifted&quot; the source of truth for our widget's important state up to the app level, while keeping the unimportant implementation details (just the size, in this case) internal.</p>
+<p>Now if you change the hardcoded hue value being passed to <code>make_sl_image()</code> to <code>data.hue</code>, you should see whatever initial hue state you've provided your app.</p>
+<h2>8. Sliders (and Lenses!)</h2>
+<p>So right now we can set the hue at compile time. But a real color picker would let you adjust it on the fly. What we need is a slider.</p>
+<p>I just so happen to be the proud father of a widget called Slider. While our ColorPicker is currently designed to work with data of type <code>HSL</code>, Slider operates on plain old <code>f64</code>. So if we put a Slider in our widget tree, what will happen? We'll get an error something like this:</p>
+<pre style="white-space: pre-wrap;">the trait `druid::Widget&lt;HSL&gt;` is not implemented for `impl druid::Widget&lt;f64&gt;`
+</pre>
+<p>But ColorPicker is just three f64s under the hood. How do we get at those?</p>
+<p>Enter Lenses. A lens is a datatype that gives access to a part of a larger data structure. In our case, we can derive Lens just like how we derived Data:</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">use </span><span style="color:#323232;">druid::{Lens, </span><span style="font-weight:bold;color:#a71d5d;">...</span><span style="color:#323232;">};
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">#[derive(Clone, Data, Lens)]
+</span><span style="font-weight:bold;color:#a71d5d;">struct </span><span style="color:#323232;">HSL {
+</span><span style="color:#323232;">    </span><span style="color:#323232;">hue: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">saturation: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">,
+</span><span style="color:#323232;">    </span><span style="color:#323232;">lightness: </span><span style="font-weight:bold;color:#a71d5d;">f64</span><span style="color:#323232;">,
+</span><span style="color:#323232;">}
+</span></pre>
+<p>This macro creates a module called <code>lenses</code>, with a submodule of <code>hsl</code>, with subsubmodules of <code>hue</code>, <code>saturation</code>, and <code>lightness</code>. We can use these lenses to adapt our <code>HSL</code> data structure to any widget that expects an f64:</p>
+<pre style="background-color: #eff0f1;"><span style="color:#323232;">LensWrap::new(WidgetThatExpectsf64::new(), lenses::hsl::hue);
+</span></pre>
+<p>Sorry for the excess of magic, Druid is a work in progress and we're still figuring out the design for some of this stuff. The most important takeaway for now is that Lenses let us &quot;focus&quot; on a single field in a larger data structure.</p>
+<pre style="white-space: pre-wrap;">                   +-------+
+                   |       |
+Struct with        |       |       That one
+a bunch of  +----&gt; | Lens  | +---&gt; field we
+fields             |       |       care about
+                   |       |
+                   +-------+
+</pre>
+<p>You could think of them like a mask in Photoshop:
+<img src="../static/images/dw_lens.png" alt="lens mask" /></p>
+<p>Or, if it helps, just think of it as a getter / setter.</p>
+<p>Okay, so we're about to expand our widget tree a bit. Let's spin it out into its own function. For starters, let's just do a lens-wrapped Slider on its own and then we'll add the ColorPicker back in.</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">use </span><span style="color:#323232;">druid::{LensWrap, </span><span style="font-weight:bold;color:#a71d5d;">...</span><span style="color:#323232;">};
+</span><span style="font-weight:bold;color:#a71d5d;">use </span><span style="color:#323232;">druid::widget::{Slider};
+</span><span style="color:#323232;">
+</span><span style="font-weight:bold;color:#a71d5d;">fn </span><span style="font-weight:bold;color:#795da3;">ui_builder</span><span style="color:#323232;">() -&gt; impl Widget&lt;HSL&gt; {
+</span><span style="color:#323232;">    </span><span style="color:#323232;">
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> slider </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">LensWrap::new(Slider::new(), lenses::hsl::hue);
+</span><span style="color:#323232;">    </span><span style="color:#323232;">
+</span><span style="color:#323232;">    </span><span style="color:#323232;">slider
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">}
+</span><span style="color:#323232;">
+</span><span style="font-weight:bold;color:#a71d5d;">fn </span><span style="font-weight:bold;color:#795da3;">main</span><span style="color:#323232;">() {
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> window </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">WindowDesc::new(ui_builder);
+</span><span style="color:#323232;">    </span><span style="color:#323232;">
+</span><span style="color:#323232;">    </span><span style="font-weight:bold;color:#a71d5d;">...
+</span><span style="color:#323232;">    </span><span style="color:#323232;">
+</span><span style="color:#323232;">}
+</span></pre>
+<p>So now <code>ui_builder()</code> will construct our widget tree for us. We pass the Slider widget and the hue lens to LensWrap, which acts as a higher order widget. The Slider gets (mutable!) access to the HSL’s hue field.</p>
+<p>If you run that, you should get an app that's just a Slider. Let's add a few labels so we can see what the slider is doing.</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">use </span><span style="color:#323232;">druid::widget::{Column, DynLabel, </span><span style="font-weight:bold;color:#a71d5d;">...</span><span style="color:#323232;">};
+</span><span style="color:#323232;">
+</span><span style="font-weight:bold;color:#a71d5d;">let mut</span><span style="color:#323232;"> col </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">Column::new();
+</span><span style="color:#323232;">
+</span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> slider </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">LensWrap::new(Slider::new(), lenses::hsl::hue);
+</span><span style="color:#323232;">
+</span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> hue_label </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">DynLabel::new(|data: </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">HSL, _env| {
+</span><span style="color:#323232;">    </span><span style="color:#323232;">format!(</span><span style="color:#183691;">&quot;Hue: </span><span style="color:#0086b3;">{0:.2}</span><span style="color:#183691;">&quot;</span><span style="color:#323232;">, data.hue)
+</span><span style="color:#323232;">});
+</span><span style="color:#323232;">
+</span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> sat_label </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">DynLabel::new(|data: </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">HSL, _env| {
+</span><span style="color:#323232;">    </span><span style="color:#323232;">format!(</span><span style="color:#183691;">&quot;Saturation: </span><span style="color:#0086b3;">{0:.2}</span><span style="color:#183691;">&quot;</span><span style="color:#323232;">, data.saturation)
+</span><span style="color:#323232;">});
+</span><span style="color:#323232;">
+</span><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> light_label </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">DynLabel::new(|data: </span><span style="font-weight:bold;color:#a71d5d;">&amp;</span><span style="color:#323232;">HSL, _env| {
+</span><span style="color:#323232;">    </span><span style="color:#323232;">format!(</span><span style="color:#183691;">&quot;Lightness: </span><span style="color:#0086b3;">{0:.2}</span><span style="color:#183691;">&quot;</span><span style="color:#323232;">, data.lightness)
+</span><span style="color:#323232;">});
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">col.</span><span style="color:#62a35c;">add_child</span><span style="color:#323232;">(slider, </span><span style="color:#0086b3;">1.0</span><span style="color:#323232;">);
+</span><span style="color:#323232;">col.</span><span style="color:#62a35c;">add_child</span><span style="color:#323232;">(hue_label, </span><span style="color:#0086b3;">1.0</span><span style="color:#323232;">);
+</span><span style="color:#323232;">col.</span><span style="color:#62a35c;">add_child</span><span style="color:#323232;">(sat_label, </span><span style="color:#0086b3;">1.0</span><span style="color:#323232;">);
+</span><span style="color:#323232;">col.</span><span style="color:#62a35c;">add_child</span><span style="color:#323232;">(light_label, </span><span style="color:#0086b3;">1.0</span><span style="color:#323232;">);
+</span><span style="color:#323232;">col
+</span></pre>
+<p>Each of these DynLabel widgets accepts a closure which converts the data into a String (so no need for a Lens). We add them each, along with the slider, to a column widget to keep everything nice and organized.</p>
+<p>Now let's add back in the ColorPicker widget.</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> color_picker </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> ColorPicker {
+</span><span style="color:#323232;">    </span><span style="color:#323232;">size: Size::default()
+</span><span style="color:#323232;">};
+</span><span style="color:#323232;">col.</span><span style="color:#62a35c;">add_child</span><span style="color:#323232;">(color_picker, </span><span style="color:#0086b3;">1.0</span><span style="color:#323232;">);
+</span></pre>
+<p>If everything has gone correctly, the hue slider should control the hue of our ColorPicker now. Not too bad, yes?</p>
+<h2>Eight Point Five</h2>
+<p>One quick fix to keep our cursor (mostly) inside its zone:</p>
+<pre style="background-color: #eff0f1;"><span style="color:#323232;">data.saturation </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">(mouse.pos.x </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#323232;">self.size.width).</span><span style="color:#62a35c;">max</span><span style="color:#323232;">(</span><span style="color:#0086b3;">0.0</span><span style="color:#323232;">).</span><span style="color:#62a35c;">min</span><span style="color:#323232;">(</span><span style="color:#0086b3;">1.0</span><span style="color:#323232;">);
+</span><span style="color:#323232;">data.lightness </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">(mouse.pos.y </span><span style="font-weight:bold;color:#a71d5d;">/ </span><span style="color:#323232;">self.size.height).</span><span style="color:#62a35c;">max</span><span style="color:#323232;">(</span><span style="color:#0086b3;">0.0</span><span style="color:#323232;">).</span><span style="color:#62a35c;">min</span><span style="color:#323232;">(</span><span style="color:#0086b3;">1.0</span><span style="color:#323232;">);
+</span></pre>
+<h2>9. Layout</h2>
+<p>Right now our rectangle of color squishes and squashes when we resize the window. That might be appropriate for some widgets, but in my experience, most color pickers have a fixed size and aspect ratio.</p>
+<p>Also, just so you're aware, Piet's <code>draw_image()</code> method automatically scales and adjusts the aspect ratio of an image to match the rectangle it's passed. That's why our &quot;256 x 256&quot; image is never actually &quot;256 x 256&quot;</p>
+<p>Let's revisit the <code>layout</code> method and fix this.</p>
+<pre style="background-color: #eff0f1;"><span style="font-weight:bold;color:#a71d5d;">let</span><span style="color:#323232;"> default_size </span><span style="font-weight:bold;color:#a71d5d;">= </span><span style="color:#323232;">Size::new(</span><span style="color:#0086b3;">256.</span><span style="color:#323232;">, </span><span style="color:#0086b3;">256.</span><span style="color:#323232;">);
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">self.size </span><span style="font-weight:bold;color:#a71d5d;">=</span><span style="color:#323232;"> bc.</span><span style="color:#62a35c;">constrain</span><span style="color:#323232;">(default_size);
+</span><span style="color:#323232;">
+</span><span style="color:#323232;">self.size
+</span></pre>
+<p>What <code>bc.constrain</code> is saying is: I want to be this particular size, clamped between the maximum size I'm <em>allowed</em> to fill and the minimum size I'm <em>required</em> to fill.</p>
+<p>So if we run this... nothing has changed. That's because, in fact, the constraints we're being passed have an identical minimum and max. Therefore <code>constrain</code> ends up ignoring our <code>default_size</code> entirely.</p>
+<p>To fix this we need one more widget to wrap <code>color_picker</code> when we add it to <code>col</code>.</p>
+<pre style="background-color: #eff0f1;"><span style="color:#323232;">druid::widget::{Align, </span><span style="font-weight:bold;color:#a71d5d;">...</span><span style="color:#323232;">};
+</span><span style="font-style:italic;color:#969896;">// col.add_child(color_picker, 1.0);
+</span><span style="color:#323232;">col.</span><span style="color:#62a35c;">add_child</span><span style="color:#323232;">(Align::centered(color_picker), </span><span style="color:#0086b3;">1.0</span><span style="color:#323232;">);
+</span></pre>
+<p>What Align does (in addition to aligning its child) is to pass along a minimum constraint of zero size while keeping the max constraint the same.</p>
+<p>Finally, let's zero out the flex amount of the slider and labels:</p>
+<pre style="background-color: #eff0f1;"><span style="color:#323232;">col.</span><span style="color:#62a35c;">add_child</span><span style="color:#323232;">(slider, </span><span style="color:#0086b3;">0.0</span><span style="color:#323232;">);
+</span><span style="color:#323232;">col.</span><span style="color:#62a35c;">add_child</span><span style="color:#323232;">(hue_label, </span><span style="color:#0086b3;">0.0</span><span style="color:#323232;">);
+</span><span style="color:#323232;">col.</span><span style="color:#62a35c;">add_child</span><span style="color:#323232;">(sat_label, </span><span style="color:#0086b3;">0.0</span><span style="color:#323232;">);
+</span><span style="color:#323232;">col.</span><span style="color:#62a35c;">add_child</span><span style="color:#323232;">(light_label, </span><span style="color:#0086b3;">0.0</span><span style="color:#323232;">);
+</span></pre>
+<p><img src="../static/images/dw_4.png" alt="final app" /></p>
+<p>Now if we run this, we can still squish the ColorPicker if we make the window really small, but we can't stretch it beyond 256 x 256.</p>
+<h2>10. A time for self-congratulation</h2>
+<p>Good job if you got this far, and thanks for reading!</p>
+<p>Obviously there are a lot of improvements left to make. For instance, the cursor hangs off the edge on the bottom and right sides, and isn't really centered on the mouse anyway. But I think it should be pretty straightforward to solve that problem using the techniques we've already covered and some peeking at other widget code.</p>
+<p>It might be fun to make a color picker that's generic over other color spaces, but I don't really know the best way to do that myself so maybe you could do that and tell me about it.</p>
+<p>If you do run into issues in general that sound more my speed, please hit me up in my <a href="https://twitter.com/futurepaul">twitter dms</a> or join the #druid channel in our <a href="https://xi.zulipchat.com/">Zulip chat</a>.</p>
+<p><em>Update: An earlier version of this tutorial incorrectly used &quot;luminosity&quot; to refer to &quot;lightness.&quot; This has been corrected. Thank you, /u/burgundy_tide!</em></p>
+
+
+    <aside>Posted on October 23, 2019</aside>
+
+  </article>
+
+</main>
+
+<footer>
+  <p>
+    This is my blog. Thank you for being here.
+  </p>
+</footer>
+</body>
+
+</html>
