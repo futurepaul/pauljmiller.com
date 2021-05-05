@@ -1,0 +1,5 @@
+{
+  "redirects": [
+    { "source": "/projects(.*)", "destination": "https://paul.lol/projects" }
+  ]
+}
