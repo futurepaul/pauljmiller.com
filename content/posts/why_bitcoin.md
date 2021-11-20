@@ -1,6 +1,6 @@
 +++
 title = "WHY BITCOIN"
-slug = "WHY-BITCOIN"
+slug = "why-bitcoin"
 subtitle = "A NOTE FOR FRIENDS AND FAMILY" 
 date = "2019-09-21T00:45:59.324310806Z"
 +++
