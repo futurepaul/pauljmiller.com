@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>
+    
+    A skateboard for the mind
+    
+  </title>
+  <link rel="shortcut icon" href="/static/favicon.ico" />
+  <link rel="stylesheet" href="/static/normalize.css" />
+  <link rel="stylesheet" href="/static/main.css" />
+  <link rel="alternate" type="application/rss+xml" title="Paul's blog" href="/rss.xml" />
+</head>
+
+<body>
+  <header>
+    <h1><a class="active" href="https://pauljmiller.com">Paul's blog</a><a href="/projects.html">projects</a></h1>
+  </header>
+
+<main>
+  <article>
+    <h1>A skateboard for the mind</h1>
+    <h2>I'M MAKING AN ANALOGY HERE</h2>
+
+    <p><em>This is a writeup I did of a <a href="https://anchor.fm/futurepaul/episodes/Hmm-are-we-using-computers-correctly-edr27i">solo podcast I recorded two years ago</a>. My attempt was to gather together some of my ideas on how computers could be better. Because I often find myself referencing &quot;that skateboard blog&quot; I did, but actually never posted, I figured I would post it here in my grand tradition of posting well-aged and somewhat discarded content here.</em></p>
+<p>The computer is &quot;a bicycle for our minds,&quot; as <a href="https://www.youtube.com/watch?v=rTRzYjoZhIY">Steve Jobs once said</a>.</p>
+<p>Do you ever watch those velodrome events in the Olympics? They either have a rolling start, or they have to have someone holding them up for a standing start. The bikers look silly and helpless until they get moving. And then they go in a loop, round and round, very, very fast. If you turn a little too hard your wheels slide out from under you and you eat it. When bikers crash in the velodrome  their paper-thin costumes tear to shreds. The road rash is horrific.</p>
+<p>What if we thought of the computer as a &quot;skateboard for the mind?&quot;</p>
+<p>Skateboarding is improvisation. Repeated failure. Creative recombination. There's no &quot;right way&quot; to skate. It's also much slower than riding a bike. But much cooler.</p>
+<p>I'M MAKING AN ANALOGY HERE.</p>
+<p>The tradeoffs we've made in the development of computers since the 60s have favored the &quot;efficiency&quot; and &quot;raw speed&quot; of the velodrome over the ability to turn your own way.</p>
+<p>The greatest bicycle I've ever owned is my iPad. It's always fast, always responsive, and incredibly secure. And yet, it can only do what Apple and its blessed legion of third-party developers allow it to do. Trying to code on the iPad is like riding the wrong way in a velodrome. &quot;That's not what it's for!&quot; Coding applications FOR the iPad ON the iPad is impossible. Unless you write some Swift in a text editor that you copy into Xcode later like a jokester.</p>
+<p>What would a &quot;skateboard&quot; computer be like? How do we get there?</p>
+<h1>The Cuckoo's Egg</h1>
+<blockquote>
+<p>“The future is already here – it's just not evenly distributed.&quot; - William Gibson</p>
+</blockquote>
+<p>I brought this up on the last episode, but I'm reading a book called &quot;The Cuckoo's Egg.&quot; It's making me very jealous of how much agency this guy has over his machines. In 1989!</p>
+<p>He's tracking a hacker that has been poking around in the network of computers he's responsible for. So he writes tools to help himself track and fight the hacker, while also keeping up with his &quot;day job&quot; of writing software for his fellow astronomers.</p>
+<p>Here are some &quot;skateboard&quot; things the Cuckoo's Egg guy does with his computer:</p>
+<ol>
+<li>
+<p>(Physically) intercept the hacker's connection to his system and print out the hacker's every action onto paper.</p>
+</li>
+<li>
+<p>When the hacker connects to his system, his computer dials his pager and sends a message in morse code.</p>
+</li>
+<li>
+<p>A computer simulation of telescope bending (not related to hacking, but pretty cool!)</p>
+</li>
+<li>
+<p>Statistical interpretation of 5,000 phone calls (based on end / start times)</p>
+</li>
+</ol>
+<p>This sort of tool-builder will always be an outlier. It feels like the math stuff is especially difficult to democratize. But it's hard to know HOW outlier and HOW math-wiz this has to be because we've gone so far in the other direction.</p>
+<h1>The Unix Philosophy</h1>
+<p>Here's a widely cited, rarely followed, way to use computers, known as The Unix Philosophy:</p>
+<ul>
+<li>Make each program do one thing well. To do a new job, build afresh rather than complicate old programs by adding new &quot;features&quot;.</li>
+</ul>
+<p>&quot;Do one thing and do it well,&quot; is a beautiful thought, and I believe it's largely right. It's also responsible for some of the worst computer architecture crimes of this century. Microservices and <a href="https://www.theregister.co.uk/2016/03/23/npm_left_pad_chaos/">JavaScript's leftpad debacle</a> are two recent examples.</p>
+<p>You have to know when you're winning by making simple composable pieces. Otherwise the coordination cost of composing those pieces overwhelms all the original wins.</p>
+<ul>
+<li>Expect the output of every program to become the input to another, as yet unknown, program. Don't clutter output with extraneous information. Avoid stringently columnar or binary input formats. Don't insist on interactive input.</li>
+</ul>
+<p>As mad as I am about iOS's allergy to user-built software, the iOS music ecosystem is my favorite example of programs that work well together in this way. You can pipe midi from one program into another program's synth, then send the audio through AUv3 effect, then back to the first program for output.</p>
+<ul>
+<li>Design and build software, even operating systems, to be tried early, ideally within weeks. Don't hesitate to throw away the clumsy parts and rebuild them.</li>
+</ul>
+<p>lol nice job on this one unix</p>
+<ul>
+<li>Use tools in preference to unskilled help to lighten a programming task, even if you have to detour to build the tools and expect to throw some of them out after you've finished using them.</li>
+</ul>
+<p>This is &quot;yak shaving.&quot; It's easy to have the detour to make tools, and then the cascading detours that detour generates, take days, then weeks, then years, and then you're dead. It's very difficult for a tool-builder to know which and to build another tool.</p>
+<p>I guess the solution is to build more tools!</p>
+<h1>Smalltalk</h1>
+<p>This is a bit of a tangent. But it's another example of how computers could be different and improvisational.</p>
+<p>Smalltalk has a concept called &quot;reflection.&quot; Reflection has largely, though not entirely, disappeared from most of our modern systems.</p>
+<blockquote>
+<p>A reflective program is one that reasons about itself. A fully reflective procedural architecture [Smith 1983] is one in which a process can access and manipulate a full, explicit, causally connected representation of its own state. &quot;Causally connected&quot; means that any changes made to a process's self-representation are immediately reflected in its actual state and behavior.</p>
+</blockquote>
+<p><a href="http://www.laputan.org/ref89/ref89.html">Reflective Facilities in Smalltalk-80</a></p>
+<p>What can you change about your computer while it's running? The color of the menu bars? The desktop picture? Can you touch the logic?</p>
+<p>This of course is a very difficult thing to build, not to mention make performant. But it sure is interesting, isn't it?</p>
+<h1>Wearables</h1>
+<p>I don't want to brag but I've been disappointed by computers for a while now. <a href="https://www.theverge.com/2012/6/26/2986317/google-project-glass-wearable-computers-disappoint-me">Here's a piece I wrote about the history of wearable computers in 2012</a>, and how I was pretty sure Google Glass was the wrong direction.</p>
+<blockquote>
+<p>One of the first applications of a &quot;wearable computer&quot; was Beating roulette. Nerds have been bringing computers into casinos as early as the 60s, culminating in the 80s with serious wins at roulette. Thomas Bass, who wrote the definitive piece on wearables for Wired in 1998, smuggled a shoe computer to a table, gaining a 44% advantage over the house.</p>
+</blockquote>
+<blockquote>
+<p>Predicting roulette is using a computer for something only a computer could do. It's taking in the same visuals as a human, but then running complicated calculations to predict the deceleration of the wheel, the movement of the ball, and the eventual landing spot. &quot;The problem is similar to landing a spaceship on the Moon,&quot; writes Bass, &quot;except all the calculations have to be done within the few seconds between the launch of the game and the croupier's call to place your bets.&quot;</p>
+</blockquote>
+<p>The piece also digs into a concept called affective computing (referencing that same Thomas Bass article):</p>
+<blockquote>
+<p>In Bass's Wired piece, he spends time with Jennifer Healey, another Media Lab graduate student working in the Affective Computing Group. She lived life with electrodes on her face to track when she was smiling and frowning, rings to measure the conductivity of her skin (sweat), and a heart rate monitor. A Palm Pilot tracked the data, and an earpiece could let her know how she was doing.</p>
+</blockquote>
+<blockquote>
+<p>&quot;Your wearable computer could whisper in your ear,&quot; writes Negroponte, &quot;perhaps after playing for a few too many hours with a few too many kids, 'Patience, the birthday party is almost over.'&quot;</p>
+</blockquote>
+<p>Sounds creepy if Google or Facebook tried to do this for you. These are the sort of capabilities that only make sense if computing is skateboard-like. If you try this in the velodrome you'll crash and burn.</p>
+<h1>Dyson sphere</h1>
+<p>Along the lines of affective computing, <a href="https://www.theverge.com/2011/08/03/natural-user-interface-red-herring-dyson-sphere">another piece I wrote</a> even longer ago attempted to explain how much our computers are dropping on the floor when they interact with us.</p>
+<p>My comparison was to a Dyson sphere. Here's the Wikipedia definition:</p>
+<blockquote>
+<p>A Dyson sphere is a hypothetical megastructure that completely encompasses a star and captures a large percentage of its power output.</p>
+</blockquote>
+<p>Here's my wrap-up paragraph:</p>
+<blockquote>
+<p>Ultimately, it's not that I want to use less of my computers, I just want my computers to use more of me. Luckily, most of the things I've outlined here are obvious and inevitable evolutions of computer interaction. What scares me is that in the meantime we'll get so hung up on &quot;natural user interface&quot; that we'll just use fancy new gestures and voice commands to do the exact same tasks we've been doing with perfect speed and accuracy for years.</p>
+</blockquote>
+<p>Again, this is creepy to say if you're asking Google and Facebook to scan your body 60 times per second to decide what's best for you. But a skateboard computer, composed of hand-built tools, could be much more interesting.</p>
+<p>One example of Dyson sphere-ification is Kinect Star Wars vs. Beatsaber.</p>
+<p>In Kinect Star Wars you pose and hope the system recognizes that pose. Your whole human body was being translated into a small handful of button presses.</p>
+<p>Meanwhile, Beatsaber is &quot;analog.&quot; You swing the lightsabers with a full six degrees of freedom, and you hit those stupid blocks in 3D space or you don't.</p>
+<p>Fun anecdote: I recently super-doxxed myself to Google. I needed a scan of my driver's license and Social Security card. I accidentally switched to Google Lens. Lol.</p>
+<p><a href="https://www.theverge.com/2020/5/7/21250556/google-lens-copy-paste-handwritten-notes-computer-phone-ios-android">But this copy and paste thing seems cool</a>. It feels a bit more like a small tool, and not simply an appendage of the Google beast.</p>
+<p>Maybe we can have nice things one day. Probably not. But maybe?</p>
+<h1>Wrap-up</h1>
+<p>There are some really cool people in the computer industry who are challenging the assumptions of inherent complexity. <a href="https://www.youtube.com/watch?v=pW-SOdj4Kkk">Jonathan Blow</a>, <a href="https://www.youtube.com/watch?v=kZRE7HIO3vk">Casey Muratori</a>, <a href="https://www.youtube.com/watch?v=4FbQre9VQLI">Raph Levien</a>. Sometimes they might come across as curmudgeons on Twitter. But I think they're fighting the good fight.</p>
+<p>There's also a really good talk about what's gone wrong in computing called <a href="https://www.youtube.com/watch?v=lKXe3HUG2l4">&quot;The Mess We're In&quot;</a> by Joe Armstrong, RIP.</p>
+<p>Finally, I recommend the <a href="https://oxide.computer/podcast/">On The Metal podcast</a> for a technical perspective. There's a whole battle raging to make it simpler and more secure to boot a computer. I know not everyone can dip into this particular battle, but it's at least cool to know it's happening.</p>
+<p>I love riding my bike. And I'm bad at skateboarding. But I want to get better.</p>
+
+
+    <aside>Posted on February 27, 2022</aside>
+
+  </article>
+
+</main>
+
+<footer>
+  <p>
+    This is my blog. Thank you for being here.
+  </p>
+</footer>
+</body>
+
+</html>
